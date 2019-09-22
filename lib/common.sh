@@ -2,6 +2,7 @@
 
 eval "$(go env)"
 
+
 SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 USER="$(whoami)"
 
@@ -34,6 +35,13 @@ INT_IF=${INT_IF:-}
 #Root disk to deploy coreOS - use /dev/sda on BM
 ROOT_DISK_NAME=${ROOT_DISK_NAME-"/dev/sda"}
 #Container runtime
+
+K8S=${K8S:-"minikube"}
+
+if [ $K8S == "kinder" ]; then
+  CONTAINER_RUNTIME=docker
+fi
+
 CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-"podman"}
 
 export EXTERNAL_SUBNET="192.168.111.0/24"
