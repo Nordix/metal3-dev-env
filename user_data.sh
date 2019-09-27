@@ -27,31 +27,93 @@ fi
 # we know about from introspection.
 #
 network_config_files() {
-    if [ "$OS_TYPE" = "centos" ] ; then
+if [ "$OS_TYPE" = "centos" ] ; then
 cat << EOF
-write_files:
-- path: /etc/sysconfig/network-scripts/ifcfg-eth1
-  owner: root:root
-  permissions: '0644'
-  content: |
-    BOOTPROTO=dhcp
-    DEVICE=eth1
-    ONBOOT=yes
-    TYPE=Ethernet
-    USERCTL=no
+yum_repos:
+    kubernetes:
+        baseurl: https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
+        enabled: 1
+        gpgcheck: 1
+        repo_gpgcheck: 1
+        gpgkey: https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+
 runcmd:
- - [ ifup, eth1 ]
+  - [ ifup, eth1 ]
+  # Install updates
+  - yum check-update
+  # Install keepalived
+  - yum install -y gcc kernel-headers kernel-devel
+  - yum install -y keepalived
+  - systemctl start keepalived
+  - systemctl enable keepalived
+  # Install docker
+  - yum install -y yum-utils device-mapper-persistent-data lvm2
+  - yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+  - yum install docker-ce docker-ce-cli containerd.io -y
+  - usermod -aG docker centos
+  - systemctl start docker
+  - systemctl enable docker
+  # Install kubernetes
+  - setenforce 0
+  - sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
+  - yum install -y kubelet kubeadm kubectl --disableexcludes=kubernetes
+  - systemctl enable --now kubelet
+  - kubeadm init --apiserver-advertise-address 55.66.77.88 --ignore-preflight-errors=all 
+  - mkdir -p /home/centos/.kube
+  - cp /etc/kubernetes/admin.conf /home/centos/.kube/config
+  - chown centos:centos /home/centos/.kube/config
+
+# Useful for troubleshooting cloud-init issues
+output: {all: '| tee -a /var/log/cloud-init-output.log'}
+
+# keepalived Configuration file
+write_files:
+  - path: /etc/keepalived/keepalived.conf
+    content: |
+      ! Configuration File for keepalived
+      
+      global_defs {
+         notification_email {
+           sysadmin@mydomain.com
+           support@mydomain.com
+         }
+         notification_email_from lb1@mydomain.com
+         smtp_server localhost
+         smtp_connect_timeout 30
+      }
+      
+      vrrp_instance VI_1 {
+          state MASTER
+          interface eth0
+          virtual_router_id 51
+          priority 101
+          advert_int 1
+          authentication {
+              auth_type PASS
+              auth_pass 1111
+          }
+          virtual_ipaddress {
+              55.66.77.88
+          }
+      }
+  - path: /etc/sysconfig/network-scripts/ifcfg-eth1
+    owner: root:root
+    permissions: '0644'
+    content: |
+      BOOTPROTO=dhcp
+      DEVICE=eth1
+      ONBOOT=yes
+      TYPE=Ethernet
+      USERCTL=no
 EOF
     fi
 }
 
 user_data_secret() {
-  {
-    printf "#cloud-config\n\nssh_authorized_keys:\n  - "
-    cat "${SSH_PUB_KEY}"
-    printf "\n"
-    network_config_files
-  } > .userdata.tmp
+    printf "#cloud-config\n\nssh_authorized_keys:\n  - " > .userdata.tmp
+    cat ${SSH_PUB_KEY} >> .userdata.tmp
+    printf "\n" >> .userdata.tmp
+    network_config_files >> .userdata.tmp
 cat << EOF
 apiVersion: v1
 data:
