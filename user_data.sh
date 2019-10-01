@@ -26,7 +26,8 @@ fi
 # generate a network_data.json file that says to do DHCP on all interfaces that
 # we know about from introspection.
 #
-network_config_files() {
+#--------------------cloud-init master------------------------------
+cloud_init_master() {
 if [ "$OS_TYPE" = "centos" ] ; then
 cat << EOF
 yum_repos:
@@ -41,11 +42,13 @@ runcmd:
   - [ ifup, eth1 ]
   # Install updates
   - yum check-update
+
   # Install keepalived
   - yum install -y gcc kernel-headers kernel-devel
   - yum install -y keepalived
   - systemctl start keepalived
   - systemctl enable keepalived
+
   # Install docker
   - yum install -y yum-utils device-mapper-persistent-data lvm2
   - yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
@@ -53,15 +56,17 @@ runcmd:
   - usermod -aG docker centos
   - systemctl start docker
   - systemctl enable docker
-  # Install kubernetes
+
+  # Install, Init, Join kubernetes
   - setenforce 0
   - sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
   - yum install -y kubelet kubeadm kubectl --disableexcludes=kubernetes
   - systemctl enable --now kubelet
-  - kubeadm init --apiserver-advertise-address 55.66.77.88 --ignore-preflight-errors=all 
+  - kubeadm init --token "rjptsr.83zrnxd8yhrnbp8l" --apiserver-advertise-address 192.168.111.249 -v 5
   - mkdir -p /home/centos/.kube
   - cp /etc/kubernetes/admin.conf /home/centos/.kube/config
   - chown centos:centos /home/centos/.kube/config
+  # - kubeadm join 192.168.111.20:6443 --token "rjptsr.83zrnxd8yhrnbp8l" -v 5 --discovery-token-unsafe-skip-ca-verification
 
 # Useful for troubleshooting cloud-init issues
 output: {all: '| tee -a /var/log/cloud-init-output.log'}
@@ -71,7 +76,7 @@ write_files:
   - path: /etc/keepalived/keepalived.conf
     content: |
       ! Configuration File for keepalived
-      
+
       global_defs {
          notification_email {
            sysadmin@mydomain.com
@@ -81,7 +86,7 @@ write_files:
          smtp_server localhost
          smtp_connect_timeout 30
       }
-      
+
       vrrp_instance VI_1 {
           state MASTER
           interface eth0
@@ -93,7 +98,7 @@ write_files:
               auth_pass 1111
           }
           virtual_ipaddress {
-              55.66.77.88
+              192.168.111.249
           }
       }
   - path: /etc/sysconfig/network-scripts/ifcfg-eth1
@@ -108,12 +113,74 @@ write_files:
 EOF
     fi
 }
+#--------------------cloud-init worker------------------------------
+cloud_init_worker() {
+if [ "$OS_TYPE" = "centos" ] ; then
+cat << EOF
+yum_repos:
+    kubernetes:
+        baseurl: https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
+        enabled: 1
+        gpgcheck: 1
+        repo_gpgcheck: 1
+        gpgkey: https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
 
-user_data_secret() {
-    printf "#cloud-config\n\nssh_authorized_keys:\n  - " > .userdata.tmp
-    cat ${SSH_PUB_KEY} >> .userdata.tmp
-    printf "\n" >> .userdata.tmp
-    network_config_files >> .userdata.tmp
+runcmd:
+  - [ ifup, eth1 ]
+  # Install updates
+  - yum check-update
+
+  # Install docker
+  - yum install -y yum-utils device-mapper-persistent-data lvm2
+  - yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+  - yum install docker-ce docker-ce-cli containerd.io -y
+  - usermod -aG docker centos
+  - systemctl start docker
+  - systemctl enable docker
+
+  # Install, Init, Join kubernetes
+  - setenforce 0
+  - sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
+  - yum install -y kubelet kubeadm kubectl --disableexcludes=kubernetes
+  - systemctl enable --now kubelet
+  - kubeadm join 192.168.111.20:6443 --token "rjptsr.83zrnxd8yhrnbp8l" -v 5 --discovery-token-unsafe-skip-ca-verification
+
+# Useful for troubleshooting cloud-init issues
+output: {all: '| tee -a /var/log/cloud-init-output.log'}
+
+# keepalived Configuration file
+write_files:
+  - path: /etc/sysconfig/network-scripts/ifcfg-eth1
+    owner: root:root
+    permissions: '0644'
+    content: |
+      BOOTPROTO=dhcp
+      DEVICE=eth1
+      ONBOOT=yes
+      TYPE=Ethernet
+      USERCTL=no
+EOF
+    fi
+}
+
+user_data_secret()
+    if [[ $SECRET_NAME_PREFIX =~ "master" ]]; then
+    {
+      printf "#cloud-config\n\nssh_authorized_keys:\n  - "
+      cat "${SSH_PUB_KEY}"
+      printf "\n"
+      cloud_init_master
+    } > .userdata.tmp
+    else
+    {
+      printf "#cloud-config\n\nssh_authorized_keys:\n  - "
+      cat "${SSH_PUB_KEY}"
+      printf "\n"
+      cloud_init_worker
+    } > .userdata.tmp
+    fi
+
+
 cat << EOF
 apiVersion: v1
 data:
