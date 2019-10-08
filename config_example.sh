@@ -30,17 +30,17 @@
 #
 # Set the Baremetal Operator branch to checkout
 #
-#export BMOBRANCH="${BMOBRANCH:-master}"
+# export BMOBRANCH="${BMOBRANCH:-master}"
 
 #
 # Set the Cluster Api baremetal provider repository to clone
 #
-#export CAPBMREPO="${CAPBMREPO:-https://github.com/metal3-io/cluster-api-provider-baremetal.git}"
+export CAPBMREPO="${CAPBMREPO:-https://github.com/Nordix/cluster-api-provider-baremetal.git}"
 
 #
 # Set the Cluster Api baremetal provider branch to checkout
 #
-#export CAPBMBRANCH="${CAPBMBRANCH:-master}"
+export CAPBMBRANCH="${CAPBMBRANCH:-k8s_auto_setup_poc}"
 
 #
 # Force deletion of the BMO and CAPBM repositories before cloning them again
@@ -55,7 +55,7 @@
 #
 # Run a local CAPI operator instead of deploying in Kubernetes
 #
-#export CAPBM_RUN_LOCAL=true
+export CAPBM_RUN_LOCAL=true
 
 #
 # Do not retry on failure during verifications or tests of the environment

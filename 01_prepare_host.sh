@@ -94,6 +94,5 @@ function init_minikube() {
       sudo su -l -c "minikube stop" "$USER"
     fi
 }
-
 configure_minikube
 init_minikube

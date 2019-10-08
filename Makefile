@@ -8,6 +8,7 @@ configure_host:
 
 launch_mgmt_cluster:
 	./03_launch_mgmt_cluster.sh
+	./user_data.sh
 
 verify:
 	./04_verify.sh
