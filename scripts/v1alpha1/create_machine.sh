@@ -3,6 +3,9 @@
 # shellcheck disable=SC1091
 source ../../lib/common.sh
 
+V1ALPHA1_SCRIPTS_PATH="$(dirname "$(readlink -f "${0}")")"
+USER_DATA_SCRIPT_NAME="/user_data.sh"
+
 MACHINE_NAME=$1
 IMAGE_NAME=${2:-CentOS-7-x86_64-GenericCloud-1901.qcow2}
 IMAGE_URL=http://172.22.0.1/images/${IMAGE_NAME}
@@ -39,6 +42,7 @@ if echo "${IMAGE_NAME}" | grep -qi centos 2>/dev/null ; then
 else
     OS_TYPE=unknown
 fi
-./user_data.sh "${MACHINE_NAME}" "${OS_TYPE}" | cat # kubectl apply -n metal3 -f -
+
+source ${V1ALPHA1_SCRIPTS_PATH}${USER_DATA_SCRIPT_NAME} "${MACHINE_NAME}" "${OS_TYPE}" | kubectl apply -n metal3 -f -
 
 make_machine | kubectl apply -n metal3 -f -
