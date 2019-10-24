@@ -39,6 +39,6 @@ if echo "${IMAGE_NAME}" | grep -qi centos 2>/dev/null ; then
 else
     OS_TYPE=unknown
 fi
-./user_data.sh "${MACHINE_NAME}" "${OS_TYPE}" | kubectl apply -n metal3 -f -
+./user_data.sh "${MACHINE_NAME}" "${OS_TYPE}" | cat # kubectl apply -n metal3 -f -
 
 make_machine | kubectl apply -n metal3 -f -
