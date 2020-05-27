@@ -1,4 +1,9 @@
 ---
+
+  - name: Define number of BMH's
+    set_fact:
+      NUMBER_OF_BMH: "{{ NUM_OF_MASTER_REPLICAS|int +  NUM_OF_WORKER_REPLICAS|int }}"
+
   - name: Wait until cluster becomes provisioned.
     shell: "kubectl get cluster -n metal3 -o json | jq -r '.items[] | .status.phase'"
     register: provisioned_cluster
@@ -15,7 +20,7 @@
     register: provisioned_bmh
     retries: 150
     delay: 20
-    until: provisioned_bmh.stdout ==  "2"
+    until: provisioned_bmh.stdout == NUMBER_OF_BMH
 
   - name: Wait until both machines become running.
     shell: |
@@ -25,7 +30,7 @@
     register: provisioned_machines
     retries: 150
     delay: 20
-    until: provisioned_machines.stdout == "2"
+    until: provisioned_machines.stdout == NUMBER_OF_BMH
 
   - name: Define username variable as metal3 for target node
     set_fact:
@@ -91,18 +96,18 @@
       - name: Add IP_AUTODETECTION_METHOD in calico config Ubuntu
         blockinfile:
           path: /tmp/calico.yaml
-          insertafter: "{{ POD_CIDR }}"  
+          insertafter: "{{ POD_CIDR }}"
           block: |
              # for indentation
                          - name: IP_AUTODETECTION_METHOD
                            value: "interface=enp2s0"
         when:
           ansible_distribution == "Ubuntu"
-        
+
       - name: Add IP_AUTODETECTION_METHOD in calico config Centos
         blockinfile:
           path: /tmp/calico.yaml
-          insertafter: "{{ POD_CIDR }}"  
+          insertafter: "{{ POD_CIDR }}"
           block: |
              # for indentation
                          - name: IP_AUTODETECTION_METHOD
@@ -141,5 +146,5 @@
         failed_when: >
           (ready_nodes.stderr != "") or
           (ready_nodes.rc != 0) or
-          (ready_nodes.stdout != "2")
-        until: ready_nodes.stdout == "2"
+          (ready_nodes.stdout != NUMBER_OF_BMH)
+        until: ready_nodes.stdout == NUMBER_OF_BMH
