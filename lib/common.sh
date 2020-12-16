@@ -159,8 +159,6 @@ export IRONIC_INSPECTOR_IMAGE=${IRONIC_INSPECTOR_IMAGE:-"quay.io/metal3-io/ironi
 export IRONIC_DATA_DIR="$WORKING_DIR/ironic"
 export IRONIC_IMAGE_DIR="$IRONIC_DATA_DIR/html/images"
 export IRONIC_KEEPALIVED_IMAGE=${IRONIC_KEEPALIVED_IMAGE:-"quay.io/metal3-io/keepalived"}
-#TODO: Update vars.md
-export IRONIC_API_BEHIND_WSGI=${IRONIC_API_BEHIND_WSGI:-"true"}
 export INSPECTOR_REVERSE_PROXY_SETUP=${INSPECTOR_REVERSE_PROXY_SETUP:-"true"}
 
 # Baremetal operator image

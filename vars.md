@@ -51,7 +51,6 @@ assured that they are persisted.
 | IRONIC_CAKEY_FILE | Path to the CA key of Ironic |  | /opt/metal3-dev-env/certs/ironic-ca.key |
 | IRONIC_INSPECTOR_CAKEY_FILE | Path to the CA key of Ironic inspector |  | /opt/metal3-dev-env/certs/ironic-ca.key |
 | IRONIC_CERT_FILE | Path to the certificate of Ironic |  | /opt/metal3-dev-env/certs/ironic.crt |
-| IRONIC_API_BEHIND_WSGI | Whether to run ironic api as a WSGI application or not | | true | 
 | IRONIC_INSPECTOR_CERT_FILE | Path to the CA certificate of Ironic inspector |  | /opt/metal3-dev-env/certs/ironic-inspector.crt |
 | IRONIC_KEY_FILE | Path to the certificate key of Ironic |  | /opt/metal3-dev-env/certs/ironic.key |
 | IRONIC_INSPECTOR_KEY_FILE | Path to the certificate key of Ironic inspector |  | /opt/metal3-dev-env/certs/ironic-inspector.key |
