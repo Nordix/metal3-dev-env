@@ -58,7 +58,6 @@ assured that they are persisted.
 | IRONIC_INSPECTOR_USERNAME | Username for Ironic inspector basic auth |  |  |
 | IRONIC_PASSWORD | Password for Ironic basic auth |  |  |
 | IRONIC_INSPECTOR_PASSWORD | Password for Ironic inspector basic auth |  |  |
-| INSPECTOR_REVERSE_PROXY | An option to add a reverse proxy to the inspector to handle TLS | | true | 
 | REGISTRY_PORT | Container image registry port |  | 5000 |
 | HTTP_PORT | Httpd server port |  | 6180 |
 | IRONIC_INSPECTOR_PORT | Ironic Inspector port |  | 5050 |
