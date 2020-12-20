@@ -1,10 +1,7 @@
 #!/usr/bin/env bash
 set
 
-# shellcheck disable=SC1091
-source lib/logging.sh
-# shellcheck disable=SC1091
-source lib/common.sh
+
 
 if [[ $(id -u) == 0 ]]; then
   echo "Please run 'make' as a non-root user"
