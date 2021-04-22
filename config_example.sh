@@ -41,7 +41,7 @@
 
 #
 # Select the Container Runtime, can be "podman" or "docker"
-# Defaults to "podman"
+# Defaults to "docker" on ubuntu and "podman" otherwise
 #
 #export CONTAINER_RUNTIME="podman"
 
@@ -117,19 +117,19 @@
 #export KUBERNETES_BINARIES_CONFIG_VERSION="v0.2.7"
 
 # Configure provisioning network for single-stack ipv6
-#PROVISIONING_IPV6=false
+#export PROVISIONING_IPV6=false
 
 # Image OS (can be "Cirros", "Ubuntu", "Centos", overriden by IMAGE_* if set)
-#
-#export IMAGE_OS="Cirros"
+# Default: Centos
+#export IMAGE_OS="Centos"
 
 # Image for target hosts deployment
 #
-#export IMAGE_NAME="cirros-0.5.1-x86_64-disk.img"
+#export IMAGE_NAME="CENTOS_8.2_NODE_IMAGE_K8S_v1.20.4.qcow2"
 
 # Location of the image to download
 #
-#export IMAGE_LOCATION="http://download.cirros-cloud.net/0.5.1"
+#export IMAGE_LOCATION="https://artifactory.nordix.org/artifactory/airship/images/k8s_v1.20.4"
 
 # Image username for ssh
 #
@@ -166,6 +166,7 @@
 # CentOS
 # Selecting "tilt" does not deploy a management cluster, it is left up to the
 # user
+# Default is "kind" when CONTAINER_RUNTIME="docker", otherwise it is "minikube"
 # export EPHEMERAL_CLUSTER=minikube
 
 # Secure Ironic deployment with TLS ("true" or "false")
