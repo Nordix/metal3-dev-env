@@ -37,7 +37,7 @@
 # This variable defines if controlplane should scale-in or scale-out during upgrade
 # The field values can be 0 or 1. Default is 1. When set to 1 controlplane scale-out
 # When set to 0 controlplane scale-in. In case of scale-in NUM_OF_MASTER_REPLICAS must be >=3. 
-# export MAX_SURGE_VALUE=1
+#export MAX_SURGE_VALUE=1
 
 #
 # Select the Container Runtime, can be "podman" or "docker"
@@ -137,7 +137,7 @@
 
 # Container image for ironic pod
 #
-# export IRONIC_IMAGE="quay.io/metal3-io/ironic"
+#export IRONIC_IMAGE="quay.io/metal3-io/ironic"
 
 # Container image for vbmc container
 #
@@ -154,12 +154,12 @@
 #export CLUSTER_PROVISIONING_INTERFACE="ironicendpoint"
 
 # POD CIDR
-# export POD_CIDR=${POD_CIDR:-"192.168.0.0/18"}
+#export POD_CIDR=${POD_CIDR:-"192.168.0.0/18"}
 
 # Node hostname format. This is a format string that must contain exactly one
 # %d format field that will be replaced with an integer representing the number
 # of the node.
-# export NODE_HOSTNAME_FORMAT="node-%d"
+#export NODE_HOSTNAME_FORMAT="node-%d"
 
 # Ephemeral cluster used as management cluster for cluster API
 # (can be "kind", "minikube" or "tilt"). Only "minikube" is supported with
@@ -167,10 +167,10 @@
 # Selecting "tilt" does not deploy a management cluster, it is left up to the
 # user
 # Default is "kind" when CONTAINER_RUNTIME="docker", otherwise it is "minikube"
-# export EPHEMERAL_CLUSTER=minikube
+#export EPHEMERAL_CLUSTER=minikube
 
 # Secure Ironic deployment with TLS ("true" or "false")
-# export IRONIC_TLS_SETUP="true"
+#export IRONIC_TLS_SETUP="true"
 
 # Set nodeDrainTimeout for controlplane and worker template, otherwise default value will be  '0s'. 
 #
