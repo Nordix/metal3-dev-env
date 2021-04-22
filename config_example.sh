@@ -12,7 +12,7 @@
 # v6   -- IPv6
 # v4v6 -- dual-stack IPv4+IPv6
 #
-#export IP_STACK=v6
+#export IP_STACK=v4
 
 #
 # This is the subnet used on the "baremetal" libvirt network, created as the
