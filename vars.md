@@ -11,10 +11,10 @@ assured that they are persisted.
 | :------ | :------- | :--------------- | :-------- |
 | NUM_OF_MASTER_REPLICAS | Set the controlplane replica count. ||1| 
 | MAX_SURGE_VALUE | This variable defines if controlplane should scale-in or scale-out during upgrade. | 0 (scale-in) or 1 (scale-out) |1| 
-| EPHEMERAL_CLUSTER | Tool for running management/ephemeral cluster. | minikube, kind, tilt | Ubuntu default is kind. Only minikube is supported on CentOS |
+| EPHEMERAL_CLUSTER | Tool for running management/ephemeral cluster. | minikube, kind, tilt | "kind" when using docker as container (the default on Ubuntu), "minikube" otherwise |
 | EXTERNAL_SUBNET | This is the subnet used on the "baremetal" libvirt network, created as the primary network interface for the virtual bare metalhosts. | CIDR | 192.168.111.0/24 |
 | SSH_PUB_KEY | This SSH key will be automatically injected into the provisioned host by the clusterctl environment template files. | | ~/.ssh/id_rsa.pub |
-| CONTAINER_RUNTIME | Select the Container Runtime | "docker", "podman" | "podman" |
+| CONTAINER_RUNTIME | Select the Container Runtime | "docker", "podman" | "docker" on ubuntu, "podman" otherwise |
 | BMOREPO | Set the Baremetal Operator repository to clone | | https://github.com/metal3-io/baremetal-operator.git |
 | BMOBRANCH | Set the Baremetal Operator branch to checkout | | master |
 | CAPM3REPO | Set the Cluster Api Metal3 provider repository to clone | | https://github.com/metal3-io/cluster-api-provider-metal3.git |
