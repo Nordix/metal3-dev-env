@@ -133,8 +133,8 @@
 #
 #export CAPI_VERSION=v1beta1
 
-#export KUBERNETES_VERSION="v1.24.0"
-#export UPGRADED_K8S_VERSION="v1.24.0"
+#export KUBERNETES_VERSION="v1.24.1"
+#export UPGRADED_K8S_VERSION="v1.24.1"
 
 # Version of kubelet, kubeadm and kubectl binaries
 #export KUBERNETES_BINARIES_VERSION="${KUBERNETES_BINARIES_VERSION:-${KUBERNETES_VERSION}}"
