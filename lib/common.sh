@@ -420,7 +420,7 @@ fi
 FSTYPE="$(df "${FILESYSTEM}" --output=fstype | tail -n 1)"
 
 case "${FSTYPE}" in
-  'ext4'|'btrfs')
+  'ext4'|'btrfs'| 'tmpfs')
   ;;
   'xfs')
     # shellcheck disable=SC2143
