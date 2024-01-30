@@ -13,6 +13,20 @@ source lib/releases.sh
 # shellcheck disable=SC1091
 source lib/image_prepull.sh
 
+# Clean-up existing pod, if podman
+case "${CONTAINER_RUNTIME}" in
+  podman)
+    for pod in ironic-pod infra-pod; do
+      if  sudo "${CONTAINER_RUNTIME}" pod exists "${pod}" ; then
+          sudo "${CONTAINER_RUNTIME}" pod rm "${pod}" -f
+      fi
+      sudo "${CONTAINER_RUNTIME}" pod create -n "${pod}"
+    done
+    ;;
+  *)
+    ;;
+esac
+
 # cleanup ci config file if it exists from earlier run
 rm -f "${CI_CONFIG_FILE}"
 

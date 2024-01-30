@@ -126,20 +126,6 @@ fi
 # Clean-up any old ironic containers
 remove_ironic_containers
 
-# Clean-up existing pod, if podman
-case "${CONTAINER_RUNTIME}" in
-  podman)
-    for pod in ironic-pod infra-pod; do
-      if  sudo "${CONTAINER_RUNTIME}" pod exists "${pod}" ; then
-          sudo "${CONTAINER_RUNTIME}" pod rm "${pod}" -f
-      fi
-      sudo "${CONTAINER_RUNTIME}" pod create -n "${pod}"
-    done
-    ;;
-  *)
-    ;;
-esac
-
 # pre-pull node and container images
 # shellcheck disable=SC1091
 source lib/image_prepull.sh
