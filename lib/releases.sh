@@ -11,8 +11,6 @@ function get_latest_release() {
   # fail when release is not passed
   local release="${2:?no release given}"
 
-  set +x
-
   if  [ -z "${GITHUB_TOKEN:-}" ]; then
     response=$(curl -si "${url}")
   else
