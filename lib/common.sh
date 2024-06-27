@@ -293,6 +293,8 @@ else
   export CAPM3_IMAGE="${CAPM3_IMAGE:-${CONTAINER_REGISTRY}/metal3-io/cluster-api-provider-metal3:main}"
   export IPAM_IMAGE="${IPAM_IMAGE:-${CONTAINER_REGISTRY}/metal3-io/ip-address-manager:main}"
   export BMOBRANCH="${BMORELEASEBRANCH:-main}"
+  export KEEPALIVED_TAG="v0.6.1"
+  export IRONIC_TAG="v24.1.1"
 fi
 
 # IPXE support image
