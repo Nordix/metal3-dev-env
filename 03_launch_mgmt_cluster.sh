@@ -181,6 +181,9 @@ EOF
     echo "DHCP_HOSTS=${DHCP_HOSTS}" | sudo tee -a "${IRONIC_DATA_DIR}/ironic_bmo_configmap.env"
   fi
 
+  if [ "${VM_PLATFORM}" == "fake" ]; then
+    echo "OS_AGENT__REQUIRE_TLS=false" | sudo tee -a "${IRONIC_DATA_DIR}/ironic_bmo_configmap.env"
+  fi
   # Copy the generated configmap for ironic deployment
   cp "${IRONIC_DATA_DIR}/ironic_bmo_configmap.env"  "${BMOPATH}/ironic-deployment/components/keepalived/ironic_bmo_configmap.env"
 
@@ -538,7 +541,69 @@ if [ "${EPHEMERAL_CLUSTER}" != "tilt" ]; then
     # Thus we are deleting validatingwebhookconfiguration resource if exists to let BMO is working properly on local runs.
     kubectl delete validatingwebhookconfiguration/"${BMO_NAME_PREFIX}"-validating-webhook-configuration --ignore-not-found=true
   fi
+    # if fake platform (no VMs) run FakeIPA
+  if [[ "${VM_PLATFORM}" == "fake" ]]; then
+    # wait for ironic to be running
+    kubectl -n baremetal-operator-system wait --for=condition=available deployment/baremetal-operator-ironic --timeout=300s
+    mkdir -p /opt/metal3-dev-env/fake-ipa
+    kubectl -n legacy get secret -n baremetal-operator-system   ironic-cert -o json -o=jsonpath="{.data.ca\.crt}" | base64 -d > /opt/metal3-dev-env/fake-ipa/ironic-ca.crt
+    # shellcheck disable=SC2086
+    sudo "${CONTAINER_RUNTIME}" run -d --net host --name fake-ipa ${POD_NAME_INFRA} \
+      -v "/opt/metal3-dev-env/fake-ipa":/root/cert -v "/root/.ssh":/root/ssh \
+      "${FAKE_IPA_IMAGE}"
+
+    cat << EOF >> "${WORKING_DIR}/bmhosts_crs.yaml"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: default-node-1-bmc-secret
+  labels:
+      environment.metal3.io: baremetal
+type: Opaque
+data:
+  username: YWRtaW4=
+  password: cGFzc3dvcmQ=
+---
+apiVersion: metal3.io/v1alpha1
+kind: BareMetalHost
+metadata:
+  name: default-node-1 
+spec:
+  online: true
+  bmc:
+    address: redfish+http://192.168.111.1:8000/redfish/v1/Systems/27946b59-9e44-4fa7-8e91-f3527a1ef094
+    credentialsName: default-node-1-bmc-secret
+  bootMACAddress: 00:5c:52:31:3a:9c
+  bootMode: legacy
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: default-node-2-bmc-secret
+  labels:
+      environment.metal3.io: baremetal
+type: Opaque
+data:
+  username: YWRtaW4=
+  password: cGFzc3dvcmQ=
+---
+apiVersion: metal3.io/v1alpha1
+kind: BareMetalHost
+metadata:
+  name: default-node-2 
+spec:
+  online: true
+  bmc:
+    address: redfish+http://192.168.111.1:8000/redfish/v1/Systems/27946b59-9e44-4fa7-8e91-f3527a1ef095
+    credentialsName: default-node-2-bmc-secret
+  bootMACAddress: 00:5c:52:31:3a:9d
+  bootMode: legacy
+EOF
+  kubectl apply -f "${WORKING_DIR}/bmhosts_crs.yaml" -n "$NAMESPACE"
+  else
   apply_bm_hosts "$NAMESPACE"
+  fi
 elif [ "${EPHEMERAL_CLUSTER}" == "tilt" ]; then
 
 source tilt-setup/deploy_tilt_env.sh

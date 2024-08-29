@@ -111,6 +111,7 @@ ANSIBLE_FORCE_COLOR=true "${ANSIBLE}-playbook" \
     -e "extradisks=${VM_EXTRADISKS}" \
     -e "virthost=${HOSTNAME}" \
     -e "platform=${NODES_PLATFORM}" \
+    -e "vm_platform=${VM_PLATFORM:-libvirt}" \
     -e "libvirt_firmware=${LIBVIRT_FIRMWARE}" \
     -e "libvirt_secure_boot=${LIBVIRT_SECURE_BOOT}" \
     -e "libvirt_domain_type=${LIBVIRT_DOMAIN_TYPE}" \
@@ -407,6 +408,7 @@ if [[ "${BUILD_IRONIC_IMAGE_LOCALLY:-}" == "true" ]] || [[ -n "${IRONIC_LOCAL_IM
 fi
 VBMC_IMAGE=${VBMC_LOCAL_IMAGE:-${VBMC_IMAGE}}
 SUSHY_TOOLS_IMAGE=${SUSHY_TOOLS_LOCAL_IMAGE:-${SUSHY_TOOLS_IMAGE}}
+FAKE_IPA_IMAGE=${FAKE_IPA_LOCAL_IMAGE:-${FAKE_IPA_IMAGE}}
 
 # Pushing images to local registry
 for IMAGE_VAR in $(env | grep -v "_LOCAL_IMAGE=" | grep "_IMAGE=" | grep -o "^[^=]*") ; do

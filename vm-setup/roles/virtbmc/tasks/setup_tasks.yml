@@ -107,3 +107,52 @@
       SUSHY_EMULATOR_VMEDIA_VERIFY_SSL = {{ sushy_vmedia_verify_ssl }}
       SUSHY_EMULATOR_AUTH_FILE = "/root/sushy/htpasswd"
   become: true
+  when: vm_platform|default("libvirt") != "fake"
+# if FakeIPA enabled then set required sushy-tools config
+- name: Create the Redfish Virtual BMCs for FakeIPA
+  copy:
+    mode: 0750
+    dest: "{{ working_dir }}/virtualbmc/sushy-tools/conf.py"
+    content: |
+      SUSHY_EMULATOR_LIBVIRT_URI = "{{ vbmc_libvirt_uri }}"
+      SUSHY_EMULATOR_IGNORE_BOOT_DEVICE = {{ sushy_ignore_boot_device }}
+      SUSHY_EMULATOR_VMEDIA_VERIFY_SSL = {{ sushy_vmedia_verify_ssl }}
+      SUSHY_EMULATOR_AUTH_FILE = "/root/sushy/htpasswd"
+      SUSHY_EMULATOR_FAKE_DRIVER = True
+      SUSHY_EMULATOR_FAKE_IPA = True
+      SUSHY_EMULATOR_FAKE_SYSTEMS = [
+                  {
+                      'uuid': '27946b59-9e44-4fa7-8e91-f3527a1ef094',
+                      'name': 'fake1',
+                      'power_state': 'Off',
+                      'external_notifier': True,
+                      'nics': [
+                          {
+                              'mac': '00:5c:52:31:3a:9c',
+                              'ip': '172.22.0.100'
+                          },
+                          {
+                              'mac': '00:5c:52:31:3b:9c',
+                              'ip': '172.22.0.110'
+                          }
+                      ]
+                  },
+                  {
+                      'uuid': '27946b59-9e44-4fa7-8e91-f3527a1ef095',
+                      'name': 'fake2',
+                      'power_state': 'Off',
+                      'external_notifier': True,
+                      'nics': [
+                          {
+                              'mac': '00:5c:52:31:3a:9d',
+                              'ip': '172.22.0.101'
+                          },
+                         {
+                              'mac': '00:5c:52:31:3b:9d',
+                              'ip': '172.22.0.111'
+                          }
+                      ]
+                  }
+              ]
+  become: true
+  when: vm_platform|default("libvirt") == "fake"
