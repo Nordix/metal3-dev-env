@@ -543,6 +543,44 @@ if [ "${EPHEMERAL_CLUSTER}" != "tilt" ]; then
   fi
     # if fake platform (no VMs) run FakeIPA
   if [[ "${VM_PLATFORM}" == "fake" ]]; then
+    # Run FKAS (Fake k8s API)
+    ## Build
+    pushd "${FKASPATH}"
+    make build-fake-api-server
+    sudo "${CONTAINER_RUNTIME}" push --tls-verify=false 192.168.111.1:5000/localimages/api-server 
+    popd
+    cat << EOF >> "${WORKING_DIR}/fkas.yaml"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metal3-fake-api-server
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: capim
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: capim
+    spec:
+      containers:
+        - image: 192.168.111.1:5000/localimages/api-server
+          imagePullPolicy: IfNotPresent
+          name: capim
+          env:
+          - name: POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+          name: apiserver
+EOF
+    kubectl apply -f "${WORKING_DIR}/fkas.yaml"
+
     # wait for ironic to be running
     kubectl -n baremetal-operator-system wait --for=condition=available deployment/baremetal-operator-ironic --timeout=300s
     mkdir -p /opt/metal3-dev-env/fake-ipa
@@ -601,6 +639,57 @@ spec:
   bootMode: legacy
 EOF
   kubectl apply -f "${WORKING_DIR}/bmhosts_crs.yaml" -n "$NAMESPACE"
+  api_server_name=$(kubectl get pods -l app=capim -o jsonpath="{.items[0].metadata.name}")
+  kubectl port-forward pod/${api_server_name} 3333:3333 2>/dev/null&
+  sleep 60
+  openssl req -x509 -subj "/CN=Kubernetes API" -new -newkey rsa:2048 -nodes -keyout "/tmp/ca.key" -sha256 -days 3650 -out "/tmp/ca.crt"
+  openssl req -x509 -subj "/CN=ETCD CA" -new -newkey rsa:2048 -nodes -keyout "/tmp/etcd.key" -sha256 -days 3650 -out "/tmp/etcd.crt"
+
+  caKeyEncoded=$(cat /tmp/ca.key | base64 -w 0)
+  caCertEncoded=$(cat /tmp/ca.crt | base64 -w 0)
+  etcdKeyEncoded=$(cat /tmp/etcd.key | base64 -w 0)
+  etcdCertEncoded=$(cat /tmp/etcd.crt | base64 -w 0)
+  cluster_endpoints=$(curl "localhost:3333/register?resource=metal3/test1&caKey=${caKeyEncoded}&caCert=${caCertEncoded}&etcdKey=${etcdKeyEncoded}&etcdCert=${etcdCertEncoded}")
+  echo $cluster_endpoints
+  host=$(echo ${cluster_endpoints} | jq -r ".Host")
+  port=$(echo ${cluster_endpoints} | jq -r ".Port")
+  cat << EOF >> "/tmp/vars_cluster.sh"
+  export CLUSTER_APIENDPOINT_HOST=${host}
+  export CLUSTER_APIENDPOINT_PORT=${port}
+EOF
+cluster="test1"
+namespace="metal3"
+  cat <<EOF > "/tmp/${cluster}-ca-secrets.yaml"
+apiVersion: v1
+kind: Secret
+metadata:
+  labels:
+    cluster.x-k8s.io/cluster-name: ${cluster}
+  name: ${cluster}-ca
+  namespace: ${namespace}
+type: kubernetes.io/tls
+data:
+  tls.crt: ${caCertEncoded}
+  tls.key: ${caKeyEncoded}
+EOF
+
+  kubectl -n ${namespace} apply -f /tmp/${cluster}-ca-secrets.yaml
+
+  cat <<EOF > "/tmp/${cluster}-etcd-secrets.yaml"
+apiVersion: v1
+kind: Secret
+metadata:
+  labels:
+    cluster.x-k8s.io/cluster-name: ${cluster}
+  name: ${cluster}-etcd
+  namespace: ${namespace}
+type: kubernetes.io/tls
+data:
+  tls.crt: ${etcdCertEncoded}
+  tls.key: ${etcdKeyEncoded}
+EOF
+
+  kubectl -n ${namespace} apply -f /tmp/${cluster}-etcd-secrets.yaml
   else
   apply_bm_hosts "$NAMESPACE"
   fi
