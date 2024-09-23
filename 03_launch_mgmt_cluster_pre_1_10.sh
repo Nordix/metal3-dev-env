@@ -11,13 +11,6 @@ source lib/releases.sh
 # shellcheck disable=SC1091
 source lib/network.sh
 
-# TODO: Once testing of 1.9 and older releases stop this and the file named 
-# 03_launch_mgmt_cluster_pre1.10.sh can be removed
-if [[ "${IPAMRELEASE}" =~ ("v1.7.99"|"v1.8.99"|"v1.9.99")$ ]]; then
-    ./03_launch_mgmt_cluster_pre_1_10.sh
-    exit 0
-fi
-
 # Default CAPI_CONFIG_DIR to $HOME/.config directory if XDG_CONFIG_HOME not set
 CONFIG_DIR="${XDG_CONFIG_HOME:-${HOME}/.config}"
 export CAPI_CONFIG_DIR="${CONFIG_DIR}/cluster-api"
@@ -251,15 +244,6 @@ EOF
 
 launch_ironic_standalone_operator()
 {
-    # TODO(dtantsur): IPA branch support
-    # shellcheck disable=SC2311
-    cat > "${IRSOPATH}/config/manager/manager.env" <<EOF
-IRONIC_IMAGE=$(get_component_image "${IRONIC_LOCAL_IMAGE:-${IRONIC_IMAGE}}")
-MARIADB_IMAGE=$(get_component_image "${MARIADB_LOCAL_IMAGE:-${MARIADB_IMAGE}}")
-KEEPALIVED_IMAGE=$(get_component_image "${IRONIC_KEEPALIVED_LOCAL_IMAGE:-${IRONIC_KEEPALIVED_IMAGE}}")
-RAMDISK_DOWNLOADER_IMAGE=$(get_component_image "${IPA_DOWNLOADER_LOCAL_IMAGE:-${IPA_DOWNLOADER_IMAGE}}")
-EOF
-
     # shellcheck disable=SC2311
     make -C "${IRSOPATH}" install deploy IMG="$(get_component_image "${IRSO_LOCAL_IMAGE:-${IRSO_IMAGE}}")"
     kubectl wait --for=condition=Available --timeout=60s \
@@ -280,14 +264,19 @@ launch_ironic_via_irso()
     local ironic="${IRONIC_DATA_DIR}/ironic.yaml"
     cat > "${ironic}" <<EOF
 ---
-apiVersion: metal3.io/v1alpha1
+apiVersion: ironic.metal3.io/v1alpha1
 kind: Ironic
 metadata:
   name: ironic
   namespace: "${IRONIC_NAMESPACE}"
 spec:
-  credentialsRef:
-    name: ironic-auth
+  apiCredentialsName: ironic-auth
+  images:
+    deployRamdiskBranch: "${IPA_BRANCH}"
+    deployRamdiskDownloader: "$(get_component_image "${IPA_DOWNLOADER_LOCAL_IMAGE:-${IPA_DOWNLOADER_IMAGE}}")"
+    ironic: "$(get_component_image "${IRONIC_LOCAL_IMAGE:-${IRONIC_IMAGE}}")"
+    keepalived: "$(get_component_image "${IRONIC_KEEPALIVED_LOCAL_IMAGE:-${IRONIC_KEEPALIVED_IMAGE}}")"
+  version: "${IRSO_IRONIC_VERSION}"
   networking:
     dhcp:
       rangeBegin: "${CLUSTER_DHCP_RANGE_START}"
@@ -309,8 +298,8 @@ EOF
     if [[ -r "${IRONIC_CERT_FILE}" ]] && [[ -r "${IRONIC_KEY_FILE}" ]]; then
         kubectl create secret tls ironic-cert -n "${IRONIC_NAMESPACE}" --key="${IRONIC_KEY_FILE}" --cert="${IRONIC_CERT_FILE}"
         cat >> "${ironic}" <<EOF
-  tlsRef:
-    name: ironic-cert
+  tls:
+    certificateName: ironic-cert
 EOF
     fi
 
@@ -319,17 +308,17 @@ EOF
         kubectl create secret tls ironic-cacert -n "${IRONIC_NAMESPACE}" --key="${IRONIC_CAKEY_FILE}" --cert="${IRONIC_CACERT_FILE}"
     fi
 
-    if [[ "${IRONIC_USE_MARIADB}" = "true" ]]; then
+    if [[ "${IRONIC_USE_MARIADB:-false}" = "true" ]]; then
         cat >> "${ironic}" <<EOF
-  databaseRef:
-    name: ironic-db
+  databaseName: ironic-db
 ---
-apiVersion: metal3.io/v1alpha1
+apiVersion: ironic.metal3.io/v1alpha1
 kind: IronicDatabase
 metadata:
   name: ironic-db
   namespace: "${IRONIC_NAMESPACE}"
-spec: {}
+spec:
+  image: "$(get_component_image "${MARIADB_LOCAL_IMAGE:-${MARIADB_IMAGE}}")"
 EOF
   fi
 
@@ -341,7 +330,7 @@ EOF
     if ! kubectl wait --for=condition=Ready --timeout="${IRONIC_ROLLOUT_WAIT}m" -n "${IRONIC_NAMESPACE}" ironic/ironic; then
         # FIXME(dtantsur): remove this when Ironic objects are collected in the CI
         kubectl get -n "${IRONIC_NAMESPACE}" -o yaml ironic/ironic
-        if [[ "${IRONIC_USE_MARIADB}" = "true" ]]; then
+        if [[ "${IRONIC_USE_MARIADB:-false}" = "true" ]]; then
             kubectl get -n "${IRONIC_NAMESPACE}" -o yaml ironicdatabase/ironic-db
         fi
         exit 1
@@ -432,6 +421,20 @@ apply_bm_hosts()
 # CAPM3 deployment functions
 # --------------------------
 
+#
+# Update the imports for the CAPM3 deployment files
+#
+update_capm3_imports()
+{
+    pushd "${CAPM3PATH}"
+
+    make kustomize
+    ./hack/tools/bin/kustomize build "${IPAMPATH}/config/default" > config/ipam/metal3-ipam-components.yaml
+
+    sed -i -e "s#https://github.com/metal3-io/ip-address-manager/releases/download/v.*/ipam-components.yaml#metal3-ipam-components.yaml#" "config/ipam/kustomization.yaml"
+    popd
+}
+
 get_component_image()
 {
     local orig_image=$1
@@ -461,8 +464,13 @@ update_component_image()
 
     # shellcheck disable=SC2311
     tmp_image="$(get_component_image "${orig_image}")"
-    export MANIFEST_IMG="${tmp_image%:*}"
-    export MANIFEST_TAG="${tmp_image##*:}"
+    if [[ "${import}" = "IPAM" ]]; then
+        export MANIFEST_IMG_IPAM="${tmp_image%:*}"
+        export MANIFEST_TAG_IPAM="${tmp_image##*:}"
+    else
+        export MANIFEST_IMG="${tmp_image%:*}"
+        export MANIFEST_TAG="${tmp_image##*:}"
+    fi
 
     # NOTE: It is assumed that we are already in the correct directory to run make
     case "${import}" in
@@ -473,7 +481,7 @@ update_component_image()
             make set-manifest-image
             ;;
         "IPAM")
-            make set-manifest-image
+            make set-manifest-image-ipam
             ;;
         "Ironic")
             make set-manifest-image-ironic
@@ -496,18 +504,11 @@ update_component_image()
 #
 # Update the clusterctl deployment files to use local repositories
 #
-patch_clusterctl(){
-
+patch_clusterctl()
+{
     pushd "${CAPM3PATH}"
     mkdir -p "${CAPI_CONFIG_DIR}"
     touch "${CAPI_CONFIG_DIR}"/clusterctl.yaml
-
-    cat << EOF > "${CAPI_CONFIG_DIR}"/clusterctl.yaml
-providers:
-- name: metal3ipam
-  url: https://github.com/metal3-io/ip-address-manager/releases/${IPAMRELEASE}/ipam-components.yaml
-  type: IPAMProvider
-EOF
 
     # At this point the images variables have been updated with update_images
     # Reflect the change in components files
@@ -517,27 +518,18 @@ EOF
         update_component_image CAPM3 "${CAPM3_IMAGE}"
     fi
 
-    make release-manifests
-
-    rm -rf "${CAPI_CONFIG_DIR}"/overrides/infrastructure-metal3/"${CAPM3RELEASE}"
-    mkdir -p "${CAPI_CONFIG_DIR}"/overrides/infrastructure-metal3/"${CAPM3RELEASE}"
-    cp out/*.yaml "${CAPI_CONFIG_DIR}"/overrides/infrastructure-metal3/"${CAPM3RELEASE}"
-    popd
-}
-
-patch_ipam(){
-    pushd "${IPAMPATH}"
-
     if [[ -n "${IPAM_LOCAL_IMAGE:-}" ]]; then
         update_component_image IPAM "${IPAM_LOCAL_IMAGE}"
     else
         update_component_image IPAM "${IPAM_IMAGE}"
     fi
 
+    update_capm3_imports
     make release-manifests
-    rm -rf "${CAPI_CONFIG_DIR}"/overrides/ipam-metal3ipam/"${IPAMRELEASE}"
-    mkdir -p "${CAPI_CONFIG_DIR}"/overrides/ipam-metal3ipam/"${IPAMRELEASE}"
-    cp out/*.yaml "${CAPI_CONFIG_DIR}"/overrides/ipam-metal3ipam/"${IPAMRELEASE}"
+
+    rm -rf "${CAPI_CONFIG_DIR}"/overrides/infrastructure-metal3/"${CAPM3RELEASE}"
+    mkdir -p "${CAPI_CONFIG_DIR}"/overrides/infrastructure-metal3/"${CAPM3RELEASE}"
+    cp out/*.yaml "${CAPI_CONFIG_DIR}"/overrides/infrastructure-metal3/"${CAPM3RELEASE}"
     popd
 }
 
@@ -568,7 +560,7 @@ launch_cluster_api_provider_metal3()
 
     # shellcheck disable=SC2153
     clusterctl init --core cluster-api:"${CAPIRELEASE}" --bootstrap kubeadm:"${CAPIRELEASE}" \
-      --control-plane kubeadm:"${CAPIRELEASE}" --infrastructure=metal3:"${CAPM3RELEASE}"  -v5 --ipam=metal3ipam:"${IPAMRELEASE}"
+        --control-plane kubeadm:"${CAPIRELEASE}" --infrastructure=metal3:"${CAPM3RELEASE}"  -v5
 
     if [[ "${CAPM3_RUN_LOCAL}" = true ]]; then
         touch capm3.out.log
@@ -732,7 +724,6 @@ start_management_cluster
 kubectl create namespace metal3
 
 patch_clusterctl
-patch_ipam
 launch_cluster_api_provider_metal3
 BMO_NAME_PREFIX="${NAMEPREFIX}"
 launch_baremetal_operator
