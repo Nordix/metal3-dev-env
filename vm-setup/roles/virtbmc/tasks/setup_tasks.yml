@@ -108,6 +108,31 @@
       SUSHY_EMULATOR_AUTH_FILE = "/root/sushy/htpasswd"
   become: true
   when: vm_platform|default("libvirt") != "fake"
+
+- name: get a list of MACs to use
+  generate_macs:
+    nodes: "{{ vm_nodes }}"
+    networks: "{{ networks }}"
+  register: node_mac_map
+  when: vm_nodes | length > 0
+
+# Define the fake vm nodes.  These will be
+# used by sushy-tools.
+- name: Define fake vms
+  template:
+    src: ../templates/fake_nodes.json.j2
+    dest: "{{ fake_nodes_file }}"
+
+# Generate the ironic node inventory files.  Note that this
+# task *must* occur after the above vm tasks, because if
+# `vm_nodes` is defined the template depends on the
+# `node_mac_map` variable.
+- name: Write ironic node json files
+  template:
+    src: ../templates/ironic_nodes.json.j2
+    dest: "{{ nodes_file }}"
+    force: no
+
 # if FakeIPA enabled then set required sushy-tools config
 - name: Create the Redfish Virtual BMCs for FakeIPA
   copy:

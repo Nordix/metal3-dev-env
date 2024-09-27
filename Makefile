@@ -25,6 +25,9 @@ host_cleanup:
 test:
 	./tests/test.sh
 
+test-ironic-scalabilty:
+	./tests/test.sh
+
 lint:
 	./hack/shellcheck.sh
 
