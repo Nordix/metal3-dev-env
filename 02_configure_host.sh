@@ -409,6 +409,7 @@ fi
 VBMC_IMAGE=${VBMC_LOCAL_IMAGE:-${VBMC_IMAGE}}
 SUSHY_TOOLS_IMAGE=${SUSHY_TOOLS_LOCAL_IMAGE:-${SUSHY_TOOLS_IMAGE}}
 FAKE_IPA_IMAGE=${FAKE_IPA_LOCAL_IMAGE:-${FAKE_IPA_IMAGE}}
+FKAS_IMAGE=${FKAS_LOCAL_IMAGE:-${FKAS_IMAGE}}
 
 # Pushing images to local registry
 for IMAGE_VAR in $(env | grep -v "_LOCAL_IMAGE=" | grep "_IMAGE=" | grep -o "^[^=]*") ; do
