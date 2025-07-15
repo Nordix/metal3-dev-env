@@ -79,3 +79,21 @@
       become: yes
   become: yes
   when: ansible_os_family == "RedHat"
+
+- name: Install packages on SLES 15 SP6
+  block:
+    - name: Install packages on SLES 15
+      package:
+        name: "{{ packages.sles.common.packages }}"
+        state: present
+
+    - name: Install packages using pip3
+      pip:
+        virtualenv: "{{ ANSIBLE_VENV }}"
+        name: "{{ packages.sles.pip3 }}"
+        state: present
+
+    - name: Perform SLES required configurations
+      include_tasks: sles_required_packages.yml
+  become: yes
+  when: ansible_os_family == "Suse"
