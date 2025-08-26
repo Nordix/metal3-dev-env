@@ -37,6 +37,11 @@
         name: "{{ packages.ubuntu.pip3 }}"
         state: present
       when: ansible_distribution_version == "24.04" 
+    - name: Install IPv6 only required packages
+      package:
+        name: "{{ packages.ubuntu.ipv6 }}"
+        state: present
+      when: ENABLE_NAT64 == "true"
     - name: Add TPM emulator
       block:
         - name: Add TPM emulator PPA

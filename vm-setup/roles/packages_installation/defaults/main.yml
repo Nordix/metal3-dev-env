@@ -60,6 +60,10 @@ packages:
     - docker-py
     - jmespath
     - passlib
+    ipv6:
+      - jool-dkms
+      - jool-tools
+      - bind9
   centos:
     common:
       packages:
@@ -99,8 +103,14 @@ packages:
       - jmespath
       - kubernetes==25.3.0
       - passlib
-DAEMON_JSON_PATH: "{{ metal3_dir }}/vm-setup/roles/packages_installation/files"
+TEMPLATES_PATH: "{{ metal3_dir }}/vm-setup/roles/packages_installation/files"
 CONTAINER_RUNTIME: "{{ lookup('env', 'CONTAINER_RUNTIME') }}"
 OS_VERSION_ID: "{{ lookup('env', 'OS_VERSION_ID') }}"
 REGISTRY: "{{ lookup('env', 'REGISTRY') }}"
 DOCKER_IPV6_SUPPORT: "{{ lookup('env', 'DOCKER_USE_IPV6_INTERNALLY') | default('false', true) }}"
+ENABLE_NAT64: "{{ lookup('env', 'ENABLE_NAT64') | default('false', true) }}"
+DNS_UPSTREAM: "{{ lookup('env', 'DNS_UPSTREAM') | default('10.1.0.2', true) }}"
+DNS64_PREFIX: "{{ lookup('env', 'DNS64_PREFIX') | default('64:ff9b::/96', true) }}"
+# Local DNS is only used in IPv6 only env
+LOCAL_DNS_V4: "{{ lookup('env', 'LOCAL_DNS_V4') | default('127.0.0.1', true) }}"
+LOCAL_DNS_V6: "{{ lookup('env', 'LOCAL_DNS_V6') | default('::1', true) }}"

@@ -66,5 +66,5 @@ spec:
         - 8.8.8.8
 {% endif %}
 {% if IP_STACK == 'v6' or IP_STACK == 'v4v6' %}
-        - 2001:4860:4860::8888
+        - fd55::1
 {% endif %}

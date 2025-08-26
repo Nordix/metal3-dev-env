@@ -11,7 +11,7 @@
       apt_repository:
         repo: "deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_{{ OS_VERSION_ID }}/ /"
         state: absent
-    
+
     - name: Remove Ubuntu Noble old repository (without gpg key file location)
       apt_repository:
         repo: "deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/unstable/xUbuntu_{{ OS_VERSION_ID }}/ /"
@@ -37,7 +37,7 @@
     - name: Dearmor Release key
       shell: | 
         cat /usr/share/keyrings/libcontainers-archive-keyring.asc | sudo gpg --dearmor -o /usr/share/keyrings/libcontainers-archive-keyring.gpg --yes
-    
+
     - name: Add OS repository
       lineinfile:
         path: /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list
@@ -92,11 +92,11 @@
             dest: /etc/apt/keyrings/docker.asc
             mode: '0644'
             force: true
-          
+
         - name: Dearmor GPG key
           shell: | 
             cat /etc/apt/keyrings/docker.asc | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg --yes
-                
+
         # TODO: (Sunnatillo) Remove this task after fully removing apt-key
         - name: Remove Docker old repository (without gpg key file location) 
           apt_repository:
@@ -132,7 +132,7 @@
 
         - name: Template daemon.json to /etc/docker/daemon.json
           template:
-            src: "{{ DAEMON_JSON_PATH }}/daemon.json"
+            src: "{{ TEMPLATES_PATH }}/daemon.json"
             dest: /etc/docker/daemon.json
             owner: root
             group: root
@@ -150,4 +150,48 @@
             append: yes
       when: CONTAINER_RUNTIME == "docker"
       become: yes
+
+    - name: Configure IPv6 NAT64 and DNS64
+      block:
+        - name: Start NAT64 service Jool
+          shell: |
+            modprobe jool
+            jool instance add "dev-env-nat64" --netfilter --pool6 64:ff9b::/96
+          become: yes
+
+        - name: Generate Bind9 options file
+          template:
+            src: "{{ TEMPLATES_PATH }}/named.conf.options"
+            dest: /etc/bind/named.conf.options
+            owner: root
+            group: root
+            mode: '0644'
+
+        # IPv6 only supported on ubuntu, so assume that systemd-resolved is
+        # the default dns resolution
+        - name: Disable systemd-resolved
+          ansible.builtin.systemd_service:
+            state: stopped
+            name: systemd-resolved
+
+        - name: Backup old /etc/resolv.conf to /etc/resolv.conf.backup
+          ansible.builtin.copy:
+            - src: /etc/resolv.conf
+            - dest: /etc/resolv.conf.backup
+
+        - name: Write /etc/resolv.conf to contain local DNS server
+          template:
+            src: "{{ TEMPLATES_PATH }}/resolv.conf"
+            dest: /etc/resolv.conf
+            owner: root
+            group: root
+            mode: '0644'
+
+        - name: Restart Bind9 service
+          ansible.builtin.systemd_service:
+            state: restarted
+            daemon_reload: true
+            name: named.service
+
+      when: ENABLE_NAT64 == "true"
   become: yes
