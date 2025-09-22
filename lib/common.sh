@@ -154,7 +154,7 @@ export BMO_BASE_URL="${BMO_BASE_URL:-metal3-io/baremetal-operator}"
 export RUN_LOCAL_IRONIC_SCRIPT="${BMOPATH}/tools/run_local_ironic.sh"
 
 export CAPM3PATH="${CAPM3PATH:-${M3PATH}/cluster-api-provider-metal3}"
-export CAPM3_BASE_URL="${CAPM3_BASE_URL:-metal3-io/cluster-api-provider-metal3}"
+export CAPM3_BASE_URL="${CAPM3_BASE_URL:-Nordix/cluster-api-provider-metal3}"
 export CAPM3REPO="${CAPM3REPO:-https://github.com/${CAPM3_BASE_URL}}"
 export CAPM3RELEASEBRANCH="${CAPM3RELEASEBRANCH:-main}"
 
@@ -193,7 +193,7 @@ elif [[ "${CAPM3RELEASEBRANCH}" == "release-1.11" ]]; then
   export CAPM3BRANCH="${CAPM3BRANCH:-release-1.11}"
   export IPAMBRANCH="${IPAMBRANCH:-release-1.11}"
 else
-  export CAPM3BRANCH="${CAPM3BRANCH:-main}"
+  export CAPM3BRANCH="${CAPM3BRANCH:-Sunnatillo/add-failure-domain}"
   export IPAMBRANCH="${IPAMBRANCH:-main}"
 fi
 

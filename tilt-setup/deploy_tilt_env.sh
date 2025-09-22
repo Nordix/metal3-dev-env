@@ -10,18 +10,7 @@ sed -i 's/"kustomize_config":.*/"kustomize_config": true,/' tilt-provider.json
 popd
 
 pushd "${CAPM3PATH}"
-cat <<EOF > tilt-settings.json
-{
-  "provider_repos": ["../ip-address-manager"],
-  "enable_providers": ["metal3-ipam"],
-  "kustomize_substitutions": {
-      "DEPLOY_KERNEL_URL": "${DEPLOY_KERNEL_URL}",
-      "DEPLOY_RAMDISK_URL": "${DEPLOY_RAMDISK_URL}",
-      "IRONIC_INSPECTOR_URL": "${IRONIC_INSPECTOR_URL}",
-      "IRONIC_URL": "${IRONIC_URL}"
-  }
-}
-EOF
+
 REL_PATH_TO_DEV_ENV=$(realpath --relative-to="${BMOPATH}" "${SCRIPTDIR}")
 sed -i "s|yaml = str(kustomizesub(context + \"/config\"))|yaml = str(kustomizesub(\"${REL_PATH_TO_DEV_ENV}/config/overlays/tilt\"))|" Tiltfile
 make kind-reset
@@ -29,7 +18,9 @@ kind create cluster --name capm3 --image="${KIND_NODE_IMAGE}"
 kubectl create namespace "${NAMESPACE}"
 kubectl create namespace "${IRONIC_NAMESPACE}"
 mkdir -p "${HOME}/.config/cluster-api/overrides/infrastructure-metal3/${CAPM3RELEASE}"
-make tilt-up &
+make tilt-up
+# Install cert manager
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.18.2/cert-manager.yaml
 # wait for cert-manager to be ready, timeout after 120 seconds
 for i in {1..8}; do
     kubectl get pods -n cert-manager | grep -E 'webhook.*Running' && break
@@ -37,6 +28,7 @@ for i in {1..8}; do
     sleep 15
 done
 launch_ironic
+# Install cert manager
 # deploy bmo in order to generate ironic credentials and tls
 launch_baremetal_operator
 apply_bm_hosts "${NAMESPACE}"
@@ -120,8 +112,8 @@ pushd "${CAPM3PATH}"
 # Start watching changes on bmo
 cat <<EOF > tilt-settings.json
 {
-  "provider_repos": [ "../baremetal-operator", "../ip-address-manager"],
-  "enable_providers": [ "metal3-bmo", "metal3-ipam"],
+  "provider_repos": [ "../baremetal-operator"],
+  "enable_providers": [ "metal3-bmo"],
   "kustomize_substitutions": {
       "DEPLOY_KERNEL_URL": "${DEPLOY_KERNEL_URL}",
       "DEPLOY_RAMDISK_URL": "${DEPLOY_RAMDISK_URL}",
