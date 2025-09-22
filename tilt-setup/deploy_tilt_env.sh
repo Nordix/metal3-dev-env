@@ -10,18 +10,7 @@ sed -i 's/"kustomize_config":.*/"kustomize_config": true,/' tilt-provider.json
 popd
 
 pushd "${CAPM3PATH}"
-cat <<EOF > tilt-settings.json
-{
-  "provider_repos": ["../ip-address-manager"],
-  "enable_providers": ["metal3-ipam"],
-  "kustomize_substitutions": {
-      "DEPLOY_KERNEL_URL": "${DEPLOY_KERNEL_URL}",
-      "DEPLOY_RAMDISK_URL": "${DEPLOY_RAMDISK_URL}",
-      "IRONIC_INSPECTOR_URL": "${IRONIC_INSPECTOR_URL}",
-      "IRONIC_URL": "${IRONIC_URL}"
-  }
-}
-EOF
+
 REL_PATH_TO_DEV_ENV=$(realpath --relative-to="${BMOPATH}" "${SCRIPTDIR}")
 sed -i "s|yaml = str(kustomizesub(context + \"/config\"))|yaml = str(kustomizesub(\"${REL_PATH_TO_DEV_ENV}/config/overlays/tilt\"))|" Tiltfile
 make kind-reset
@@ -120,8 +109,8 @@ pushd "${CAPM3PATH}"
 # Start watching changes on bmo
 cat <<EOF > tilt-settings.json
 {
-  "provider_repos": [ "../baremetal-operator", "../ip-address-manager"],
-  "enable_providers": [ "metal3-bmo", "metal3-ipam"],
+  "provider_repos": [ "../baremetal-operator"],
+  "enable_providers": [ "metal3-bmo"],
   "kustomize_substitutions": {
       "DEPLOY_KERNEL_URL": "${DEPLOY_KERNEL_URL}",
       "DEPLOY_RAMDISK_URL": "${DEPLOY_RAMDISK_URL}",
