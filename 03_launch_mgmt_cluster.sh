@@ -529,6 +529,20 @@ EOF
 EOF
     fi
 
+    if [[ "${GINKGO_FOCUS:-}" == "in-place-upgrade" ]]; then
+        export TEST_EXTENSION_MANIFEST_IMG="${REGISTRY}/metal3-io/test-extension:latest"
+        make docker-build-test-extension TEST_EXTENSION_IMG="${TEST_EXTENSION_MANIFEST_IMG}"
+        sudo "${CONTAINER_RUNTIME}" push "${TEST_EXTENSION_MANIFEST_IMG}"
+        make set-manifest-image-test-extension TEST_EXTENSION_IMG="${TEST_EXTENSION_MANIFEST_IMG}"
+        make release-test-extensions-manifests
+
+        cat << EOF >> "${CAPI_CONFIG_DIR}"/clusterctl.yaml
+- name: test-extension
+  type: RuntimeExtensionProvider
+  url: "${CAPI_CONFIG_DIR}/overrides/infrastructure-metal3/"${CAPM3RELEASE}"/runtime-extension-components-development.yaml"
+EOF
+    fi
+
     # At this point the images variables have been updated with update_images
     # Reflect the change in components files
     if [[ -n "${CAPM3_LOCAL_IMAGE:-}" ]]; then
