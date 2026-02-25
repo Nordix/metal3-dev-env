@@ -843,10 +843,13 @@ if [[ "${CAPI_NIGHTLY_BUILD:-}" = "true" ]]; then
     patch_capi
 fi
 
-patch_ipam
-launch_cluster_api_provider_metal3
-BMO_NAME_PREFIX="${NAMEPREFIX}"
-launch_baremetal_operator
+if [[ "${SKIP_CONTROLLERS}" = "false" ]]; then
+    patch_ipam
+    launch_cluster_api_provider_metal3
+    BMO_NAME_PREFIX="${NAMEPREFIX}"
+    launch_baremetal_operator
+fi
+
 if [[ "${USE_IRSO}" = true ]]; then
     launch_ironic_standalone_operator
     launch_ironic_via_irso
@@ -854,16 +857,18 @@ else
     launch_ironic
 fi
 
-if [[ "${BMO_RUN_LOCAL}" != true ]]; then
-    if ! kubectl rollout status deployment "${BMO_NAME_PREFIX}"-controller-manager -n "${IRONIC_NAMESPACE}" --timeout="${BMO_ROLLOUT_WAIT}"m; then
-        echo "baremetal-operator-controller-manager deployment can not be rollout"
-        exit 1
+if [[ "${SKIP_CONTROLLERS}" = "false" ]]; then
+    if [[ "${BMO_RUN_LOCAL}" != true ]]; then
+        if ! kubectl rollout status deployment "${BMO_NAME_PREFIX}"-controller-manager -n "${IRONIC_NAMESPACE}" --timeout="${BMO_ROLLOUT_WAIT}"m; then
+            echo "baremetal-operator-controller-manager deployment can not be rollout"
+            exit 1
+        fi
+    else
+        # There is no certificate to run validation webhook on local.
+        # Thus we are deleting validatingwebhookconfiguration resource if exists
+        # to let BMO is working properly on local runs.
+        kubectl delete validatingwebhookconfiguration/"${BMO_NAME_PREFIX}"-validating-webhook-configuration --ignore-not-found=true
     fi
-else
-    # There is no certificate to run validation webhook on local.
-    # Thus we are deleting validatingwebhookconfiguration resource if exists
-    # to let BMO is working properly on local runs.
-    kubectl delete validatingwebhookconfiguration/"${BMO_NAME_PREFIX}"-validating-webhook-configuration --ignore-not-found=true
 fi
 
 # Tests might want to apply bmh inside the test scipt
