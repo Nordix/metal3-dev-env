@@ -205,28 +205,30 @@ EOF
     # Note: Even though the manifests are not used for local deployment we need
     # to do this since Ironic will no longer run locally after pivot.
     # The workload cluster will use these images after pivoting.
-    if [[ -n "${IRONIC_LOCAL_IMAGE:-}" ]]; then
-        update_component_image Ironic "${IRONIC_LOCAL_IMAGE}"
-    else
-        update_component_image Ironic "${IRONIC_IMAGE}"
-    fi
+    if [[ "${SKIP_CONTROLLERS}" = "false" ]]; then
+        if [[ -n "${IRONIC_LOCAL_IMAGE:-}" ]]; then
+            update_component_image Ironic "${IRONIC_LOCAL_IMAGE}"
+        else
+            update_component_image Ironic "${IRONIC_IMAGE}"
+        fi
 
-    if [[ -n "${MARIADB_LOCAL_IMAGE:-}" ]]; then
-        update_component_image Mariadb "${MARIADB_LOCAL_IMAGE}"
-    else
-        update_component_image Mariadb "${MARIADB_IMAGE}"
-    fi
+        if [[ -n "${MARIADB_LOCAL_IMAGE:-}" ]]; then
+            update_component_image Mariadb "${MARIADB_LOCAL_IMAGE}"
+        else
+            update_component_image Mariadb "${MARIADB_IMAGE}"
+        fi
 
-    if [[ -n "${IRONIC_KEEPALIVED_LOCAL_IMAGE:-}" ]]; then
-        update_component_image Keepalived "${IRONIC_KEEPALIVED_LOCAL_IMAGE}"
-    else
-        update_component_image Keepalived "${IRONIC_KEEPALIVED_IMAGE}"
-    fi
+        if [[ -n "${IRONIC_KEEPALIVED_LOCAL_IMAGE:-}" ]]; then
+            update_component_image Keepalived "${IRONIC_KEEPALIVED_LOCAL_IMAGE}"
+        else
+            update_component_image Keepalived "${IRONIC_KEEPALIVED_IMAGE}"
+        fi
 
-    if [[ -n "${IPA_DOWNLOADER_LOCAL_IMAGE:-}" ]]; then
-        update_component_image IPA-downloader "${IPA_DOWNLOADER_LOCAL_IMAGE}"
-    else
-        update_component_image IPA-downloader "${IPA_DOWNLOADER_IMAGE}"
+        if [[ -n "${IPA_DOWNLOADER_LOCAL_IMAGE:-}" ]]; then
+            update_component_image IPA-downloader "${IPA_DOWNLOADER_LOCAL_IMAGE}"
+        else
+            update_component_image IPA-downloader "${IPA_DOWNLOADER_IMAGE}"
+        fi
     fi
 
     if [[ "${BOOTSTRAP_CLUSTER}" != "minikube" ]]; then
@@ -549,10 +551,12 @@ EOF
 
     # At this point the images variables have been updated with update_images
     # Reflect the change in components files
-    if [[ -n "${CAPM3_LOCAL_IMAGE:-}" ]]; then
-        update_component_image CAPM3 "${CAPM3_LOCAL_IMAGE}"
-    else
-        update_component_image CAPM3 "${CAPM3_IMAGE}"
+    if [[ "${SKIP_CONTROLLERS}" = "false" ]]; then
+        if [[ -n "${CAPM3_LOCAL_IMAGE:-}" ]]; then
+            update_component_image CAPM3 "${CAPM3_LOCAL_IMAGE}"
+        else
+            update_component_image CAPM3 "${CAPM3_IMAGE}"
+        fi
     fi
 
     make release-manifests
