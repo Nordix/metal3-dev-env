@@ -854,11 +854,13 @@ if [[ "${SKIP_CONTROLLERS}" = "false" ]]; then
     launch_baremetal_operator
 fi
 
-if [[ "${USE_IRSO}" = true ]]; then
-    launch_ironic_standalone_operator
-    launch_ironic_via_irso
-else
-    launch_ironic
+if [[ "${SKIP_CONTROLLERS}" = "false" ]]; then
+  if [[ "${USE_IRSO}" = true ]]; then
+      launch_ironic_standalone_operator
+      launch_ironic_via_irso
+  else
+      launch_ironic
+  fi
 fi
 
 if [[ "${SKIP_CONTROLLERS}" = "false" ]]; then
