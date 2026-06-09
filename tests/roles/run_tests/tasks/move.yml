@@ -57,13 +57,28 @@
   become_user: root
   when: BOOTSTRAP_CLUSTER == "minikube"
 
-- name: Remove Ironic from source cluster (minikube cluster)
+- name: Remove Ironic CR from source cluster (minikube cluster)
   kubernetes.core.k8s:
-    name: "{{ NAMEPREFIX }}-ironic"
-    kind: Deployment
-    state: absent
+    api_version: ironic.metal3.io/v1alpha1
+    kind: Ironic
+    name: ironic
     namespace: "{{ IRONIC_NAMESPACE }}"
+    state: absent
+    wait: yes
+    wait_timeout: 120
   when: BOOTSTRAP_CLUSTER == "minikube"
+
+- name: Remove IronicDatabase CR from source cluster (minikube cluster)
+  kubernetes.core.k8s:
+    api_version: ironic.metal3.io/v1alpha1
+    kind: IronicDatabase
+    name: ironic-db
+    namespace: "{{ IRONIC_NAMESPACE }}"
+    state: absent
+    wait: yes
+    wait_timeout: 60
+  when: BOOTSTRAP_CLUSTER == "minikube" and IRONIC_USE_MARIADB == "true"
+  ignore_errors: yes
 
 - name: Label baremetalhost CRD to pivot.
   shell: "kubectl label --overwrite crds baremetalhosts.metal3.io {{ item }}"
@@ -125,15 +140,166 @@
   args:
     chdir: "{{ BMOPATH }}"
 
-# Install Ironic
-- name: Install Ironic
-  shell: "{{ BMOPATH }}/tools/deploy.sh -i {{ BMO_IRONIC_ARGS }}"
+# Install Ironic Standalone Operator
+- name: Install Ironic Standalone Operator CRDs and controller
+  shell: "make install deploy IMG={{ IRSO_IMAGE }}"
   environment:
-    IRONIC_HOST: "{{ IRONIC_HOST }}"
-    IRONIC_HOST_IP: "{{ IRONIC_HOST_IP }}"
-    KUBECTL_ARGS: "{{ KUBECTL_ARGS }}"
+    KUBECONFIG: "/tmp/kubeconfig-{{ CLUSTER_NAME }}.yaml"
   args:
-    chdir: "{{ BMOPATH }}"
+    chdir: "{{ IRSOPATH }}"
+
+- name: Wait for IRSO controller to be available
+  kubernetes.core.k8s_info:
+    kind: Deployment
+    name: ironic-standalone-operator-controller-manager
+    namespace: ironic-standalone-operator-system
+    kubeconfig: "/tmp/kubeconfig-{{ CLUSTER_NAME }}.yaml"
+    wait: yes
+    wait_condition:
+      type: Available
+      status: "True"
+    wait_timeout: 60
+
+# Create Ironic auth secret
+- name: Read Ironic username
+  slurp:
+    src: "{{ IRONIC_AUTH_DIR }}ironic-username"
+  register: ironic_username_content
+
+- name: Read Ironic password
+  slurp:
+    src: "{{ IRONIC_AUTH_DIR }}ironic-password"
+  register: ironic_password_content
+
+- name: Create Ironic auth secret
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "/tmp/kubeconfig-{{ CLUSTER_NAME }}.yaml"
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: ironic-auth
+        namespace: "{{ IRONIC_NAMESPACE }}"
+        labels:
+          environment.metal3.io/ironic-standalone-operator: "true"
+      type: Opaque
+      data:
+        username: "{{ ironic_username_content.content }}"
+        password: "{{ ironic_password_content.content }}"
+
+# Create TLS secrets if TLS is enabled
+- name: Create Ironic TLS certificate secret
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "/tmp/kubeconfig-{{ CLUSTER_NAME }}.yaml"
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: ironic-cert
+        namespace: "{{ IRONIC_NAMESPACE }}"
+        labels:
+          environment.metal3.io/ironic-standalone-operator: "true"
+      type: kubernetes.io/tls
+      data:
+        tls.crt: "{{ lookup('file', IRONIC_CERT_FILE) | b64encode }}"
+        tls.key: "{{ lookup('file', IRONIC_KEY_FILE) | b64encode }}"
+  when: IRONIC_TLS_SETUP == "true"
+
+- name: Create Ironic CA certificate secret (for BMO)
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "/tmp/kubeconfig-{{ CLUSTER_NAME }}.yaml"
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: ironic-cacert
+        namespace: "{{ IRONIC_NAMESPACE }}"
+      type: kubernetes.io/tls
+      data:
+        tls.crt: "{{ lookup('file', IRONIC_CACERT_FILE) | b64encode }}"
+        tls.key: "{{ lookup('file', IRONIC_CAKEY_FILE) | b64encode }}"
+  when: IRONIC_TLS_SETUP == "true"
+
+# Create Ironic CR
+- name: Create Ironic CR via IRSO
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "/tmp/kubeconfig-{{ CLUSTER_NAME }}.yaml"
+    definition:
+      apiVersion: ironic.metal3.io/v1alpha1
+      kind: Ironic
+      metadata:
+        name: ironic
+        namespace: "{{ IRONIC_NAMESPACE }}"
+      spec:
+        apiCredentialsName: ironic-auth
+        images:
+          deployRamdiskBranch: "{{ IPA_BRANCH }}"
+          deployRamdiskDownloader: "{{ IPA_DOWNLOADER_IMAGE }}"
+          ironic: "{{ IRONIC_IMAGE }}"
+          keepalived: "{{ IRONIC_KEEPALIVED_IMAGE }}"
+        version: "{{ IRSO_IRONIC_VERSION }}"
+        networking:
+          dhcp:
+            rangeBegin: "{{ CLUSTER_DHCP_RANGE_START }}"
+            rangeEnd: "{{ CLUSTER_DHCP_RANGE_END }}"
+            networkCIDR: "{{ BARE_METAL_PROVISIONER_NETWORK }}"
+          interface: "{{ BARE_METAL_PROVISIONER_INTERFACE }}"
+          ipAddress: "{{ CLUSTER_BARE_METAL_PROVISIONER_IP }}"
+          ipAddressManager: keepalived
+        deployRamdisk:
+          sshKey: "{{ SSH_PUB_KEY_CONTENT }}"
+          extraKernelParams: "{{ (NODES_PLATFORM == 'libvirt') | ternary('console=ttyS0', '') }}"
+        tls: "{{ (IRONIC_TLS_SETUP == 'true') | ternary({'certificateName': 'ironic-cert'}, omit) }}"
+
+# Create IronicDatabase CR if MariaDB is enabled
+- name: Create IronicDatabase CR via IRSO
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "/tmp/kubeconfig-{{ CLUSTER_NAME }}.yaml"
+    definition:
+      apiVersion: ironic.metal3.io/v1alpha1
+      kind: IronicDatabase
+      metadata:
+        name: ironic-db
+        namespace: "{{ IRONIC_NAMESPACE }}"
+      spec:
+        image: "{{ MARIADB_IMAGE }}"
+  when: IRONIC_USE_MARIADB == "true"
+
+- name: Update Ironic CR with database reference
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "/tmp/kubeconfig-{{ CLUSTER_NAME }}.yaml"
+    definition:
+      apiVersion: ironic.metal3.io/v1alpha1
+      kind: Ironic
+      metadata:
+        name: ironic
+        namespace: "{{ IRONIC_NAMESPACE }}"
+      spec:
+        databaseName: ironic-db
+    merge_type: merge
+  when: IRONIC_USE_MARIADB == "true"
+
+# Wait for Ironic to be ready
+- name: Wait for Ironic CR to be ready
+  kubernetes.core.k8s_info:
+    api_version: ironic.metal3.io/v1alpha1
+    kind: Ironic
+    name: ironic
+    namespace: "{{ IRONIC_NAMESPACE }}"
+    kubeconfig: "/tmp/kubeconfig-{{ CLUSTER_NAME }}.yaml"
+  register: ironic_cr
+  retries: 60
+  delay: 10
+  until: >
+    (ironic_cr is succeeded) and
+    (ironic_cr.resources | length > 0) and
+    (ironic_cr.resources[0].status.conditions | default([]) | selectattr('type', 'equalto', 'Ready') | selectattr('status', 'equalto', 'True') | list | length > 0)
 
 - name: Label baremetalhost CRD in target cluster to pivot back.
   shell: "kubectl --kubeconfig /tmp/kubeconfig-{{ CLUSTER_NAME }}.yaml label crds baremetalhosts.metal3.io {{ item }} --overwrite "

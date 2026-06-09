@@ -1,13 +1,29 @@
 ############### Pivot back to source cluster ##############
 
-# Remove Ironic from target cluster
-- name: Remove Ironic from target cluster
+# Remove Ironic CR from target cluster (IRSO will clean up resources)
+- name: Remove Ironic CR from target cluster
   kubernetes.core.k8s:
-    name: "{{ NAMEPREFIX }}-ironic"
-    kind: Deployment
-    state: absent
+    api_version: ironic.metal3.io/v1alpha1
+    kind: Ironic
+    name: ironic
     namespace: "{{ IRONIC_NAMESPACE }}"
+    state: absent
     kubeconfig: "/tmp/kubeconfig-{{ CLUSTER_NAME }}.yaml"
+    wait: yes
+    wait_timeout: 120
+
+- name: Remove IronicDatabase CR from target cluster
+  kubernetes.core.k8s:
+    api_version: ironic.metal3.io/v1alpha1
+    kind: IronicDatabase
+    name: ironic-db
+    namespace: "{{ IRONIC_NAMESPACE }}"
+    state: absent
+    kubeconfig: "/tmp/kubeconfig-{{ CLUSTER_NAME }}.yaml"
+    wait: yes
+    wait_timeout: 60
+  when: IRONIC_USE_MARIADB == "true"
+  ignore_errors: yes
 
 # Install BMO in Source cluster
 - name: Install Baremetal Operator in Source cluster

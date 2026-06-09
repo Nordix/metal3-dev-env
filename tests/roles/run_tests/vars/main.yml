@@ -90,6 +90,27 @@ IRONIC_TLS_SETUP: "{{ lookup('env', 'IRONIC_TLS_SETUP') | default('true', true) 
 IRONIC_BASIC_AUTH: "{{ lookup('env', 'IRONIC_BASIC_AUTH') | default('true', true) }}"
 IRONIC_USE_MARIADB: "{{ lookup('env', 'IRONIC_USE_MARIADB') | default('false', true) }}"
 
+# IRSO (Ironic Standalone Operator) related variables
+IRSOPATH: "{{ lookup('env', 'IRSOPATH') }}"
+IRSO_IMAGE: "{{ lookup('env', 'IRSO_IMAGE') }}"
+IRSO_IRONIC_VERSION: "{{ lookup('env', 'IRSO_IRONIC_VERSION') | default('latest', true) }}"
+IRONIC_IMAGE: "{{ lookup('env', 'IRONIC_IMAGE') }}"
+IRONIC_KEEPALIVED_IMAGE: "{{ lookup('env', 'IRONIC_KEEPALIVED_IMAGE') }}"
+IPA_DOWNLOADER_IMAGE: "{{ lookup('env', 'IPA_DOWNLOADER_IMAGE') }}"
+IPA_BRANCH: "{{ lookup('env', 'IPA_BRANCH') | default('master', true) }}"
+MARIADB_IMAGE: "{{ lookup('env', 'MARIADB_IMAGE') }}"
+BARE_METAL_PROVISIONER_NETWORK: "{{ lookup('env', 'BARE_METAL_PROVISIONER_NETWORK') }}"
+BARE_METAL_PROVISIONER_INTERFACE: "{{ lookup('env', 'BARE_METAL_PROVISIONER_INTERFACE') | default('provisioning', true) }}"
+CLUSTER_BARE_METAL_PROVISIONER_IP: "{{ lookup('env', 'CLUSTER_BARE_METAL_PROVISIONER_IP') | default('172.22.0.2', true) }}"
+CLUSTER_DHCP_RANGE_START: "{{ lookup('env', 'CLUSTER_DHCP_RANGE_START') | default('172.22.0.10', true) }}"
+CLUSTER_DHCP_RANGE_END: "{{ lookup('env', 'CLUSTER_DHCP_RANGE_END') | default('172.22.0.100', true) }}"
+IRONIC_AUTH_DIR: "{{ lookup('env', 'IRONIC_AUTH_DIR') | default(IRONIC_DATA_DIR + '/auth/', true) }}"
+IRONIC_CERT_FILE: "{{ lookup('env', 'IRONIC_CERT_FILE') | default(WORKING_DIR + '/certs/ironic.crt', true) }}"
+IRONIC_KEY_FILE: "{{ lookup('env', 'IRONIC_KEY_FILE') | default(WORKING_DIR + '/certs/ironic.key', true) }}"
+IRONIC_CACERT_FILE: "{{ lookup('env', 'IRONIC_CACERT_FILE') | default(WORKING_DIR + '/certs/ironic-ca.pem', true) }}"
+IRONIC_CAKEY_FILE: "{{ lookup('env', 'IRONIC_CAKEY_FILE') | default(WORKING_DIR + '/certs/ironic-ca.key', true) }}"
+NODES_PLATFORM: "{{ lookup('env', 'NODES_PLATFORM') | default('libvirt', true) }}"
+
 # Metrics
 CAPM3_DIAGNOSTICS_ADDRESS: "localhost:8080"
 CAPM3_INSECURE_DIAGNOSTICS: "true"
