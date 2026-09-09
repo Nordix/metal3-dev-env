@@ -22,6 +22,10 @@ if [[ "${MANAGE_PRO_BRIDGE}" = "y" ]]; then
     # sudo ifconfig provisioning 172.22.0.1 netmask 255.255.255.0 up
     # Use ip command. ifconfig commands are deprecated now.
     sudo ip link set provisioning up
+    # Only the base provisioner IP is assigned here. The cluster provisioner IP
+    # (the Ironic endpoint VIP, CLUSTER_BARE_METAL_PROVISIONER_IP) is owned and
+    # assigned by the keepalived container, so it must NOT be pinned statically
+    # on the host (that would conflict with keepalived's VRRP management).
     if [[ "${BARE_METAL_PROVISIONER_SUBNET_IPV6_ONLY}" = "true" ]]; then
         sudo ip -6 addr add "${BARE_METAL_PROVISIONER_IP}"/"${BARE_METAL_PROVISIONER_CIDR}" dev ironicendpoint
       else

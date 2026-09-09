@@ -33,7 +33,11 @@ for i in {1..8}; do
     echo "Waiting for cert-manager webhooks to be ready... Attempt $i/8"
     sleep 15
 done
-launch_ironic
+# Tilt runs Ironic as local host containers (its historical behavior). With the
+# new IRSO-by-default, force the local-container path so launch_ironic does not
+# fall through to the in-cluster deploy.sh branch (which would also miss the
+# kind-node provisioning-network plumbing that only the IRSO path performs).
+IRONIC_RUN_LOCAL=true launch_ironic
 # deploy bmo in order to generate ironic credentials and tls
 launch_baremetal_operator
 apply_bm_hosts "${NAMESPACE}"

@@ -199,12 +199,15 @@ EOF
     sudo ip link add ironicendpoint type veth peer name ironic-peer
     sudo ip link set ironic-peer master provisioning
 
+    # Only assign the base provisioner IP here. The cluster provisioner IP (the
+    # Ironic endpoint VIP, CLUSTER_BARE_METAL_PROVISIONER_IP) is owned and
+    # assigned by the keepalived container, so it must NOT be pinned statically
+    # on the host (that would conflict with keepalived's VRRP management on the
+    # default in-cluster IRSO path).
     if [[ "${BARE_METAL_PROVISIONER_SUBNET_IPV6_ONLY}" = "true" ]]; then
         sudo ip -6 addr add dev ironicendpoint "${BARE_METAL_PROVISIONER_IP}"/"${BARE_METAL_PROVISIONER_CIDR}"
-        sudo ip -6 addr add dev ironicendpoint "${CLUSTER_BARE_METAL_PROVISIONER_IP}"/32
     else
         sudo ip addr add dev ironicendpoint "${BARE_METAL_PROVISIONER_IP}"/"${BARE_METAL_PROVISIONER_CIDR}"
-        sudo ip addr add dev ironicendpoint "${CLUSTER_BARE_METAL_PROVISIONER_IP}"/32
     fi
     sudo ip link set ironicendpoint up
     sudo ip link set ironic-peer up
