@@ -56,7 +56,22 @@ if [[ "${IRONIC_TLS_SETUP,,}" == "true" ]]; then
     # Generate CSR and certificate files
     if [[ ! -r "${IRONIC_CERT_FILE}" ]]; then
         openssl req -new -key "${IRONIC_KEY_FILE}" -out /tmp/ironic.csr -subj /CN="${IRONIC_HOST}"/
-        openssl x509 -req -in /tmp/ironic.csr -CA "${IRONIC_CACERT_FILE}" -CAkey "${IRONIC_CAKEY_FILE}" -CAcreateserial -out "${IRONIC_CERT_FILE}" -days 825 -sha256 -extfile <(printf "subjectAltName=IP:%s" "${IRONIC_HOST_IP}")
+        IRONIC_CERT_SAN="IP:${IRONIC_HOST_IP}"
+        # The ToR demo enables the IrSO networking service. The Ironic
+        # conductor connects to it by its Kubernetes service DNS name with TLS
+        # verification enabled, so the certificate must carry that name in its
+        # SAN. IrSO also reuses this certificate as the CA bundle it verifies
+        # against, so the ironic CA is appended below to complete the chain.
+        if [[ "${ENABLE_TOR_DEMO:-false}" == "true" ]]; then
+            IRONIC_CERT_SAN+=",DNS:ironic-networking-service.${IRONIC_NAMESPACE}.svc"
+            IRONIC_CERT_SAN+=",DNS:ironic-networking-service.${IRONIC_NAMESPACE}.svc.cluster.local"
+            IRONIC_CERT_SAN+=",DNS:ironic.${IRONIC_NAMESPACE}.svc"
+            IRONIC_CERT_SAN+=",DNS:ironic.${IRONIC_NAMESPACE}.svc.cluster.local"
+        fi
+        openssl x509 -req -in /tmp/ironic.csr -CA "${IRONIC_CACERT_FILE}" -CAkey "${IRONIC_CAKEY_FILE}" -CAcreateserial -out "${IRONIC_CERT_FILE}" -days 825 -sha256 -extfile <(printf "subjectAltName=%s" "${IRONIC_CERT_SAN}")
+        if [[ "${ENABLE_TOR_DEMO:-false}" == "true" ]]; then
+            cat "${IRONIC_CACERT_FILE}" >> "${IRONIC_CERT_FILE}"
+        fi
     fi
     if [[ ! -r "${IPXE_CERT_FILE}" ]] && [[ "${GENERATE_IPXE_CERTS}" == "true" ]]; then
         openssl req -new -key "${IPXE_KEY_FILE}" -out /tmp/ipxe.csr -subj /CN="${IRONIC_HOST}"/

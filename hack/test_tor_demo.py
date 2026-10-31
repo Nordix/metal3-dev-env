@@ -289,6 +289,32 @@ BMO_IRONIC_ARGS=()
         self.assertLess(tap_cleanup, bridge_cleanup)
         self.assertIn("enable_tor_demo", teardown[tap_cleanup]["when"])
 
+    def test_tls_cert_networking_san_and_ca_bundle(self):
+        source = ROOT / "lib/ironic_tls_setup.sh"
+        name = "ironic-networking-service.baremetal-operator-system.svc"
+        for enabled, expected_certs in ((True, 2), (False, 1)):
+            with self.subTest(enabled=enabled), tempfile.TemporaryDirectory() as workdir:
+                environment = dict(
+                    PATH=os.environ["PATH"], IRONIC_TLS_SETUP="true",
+                    WORKING_DIR=workdir,
+                    CLUSTER_BARE_METAL_PROVISIONER_HOST="172.22.0.2",
+                    IRONIC_HOST="172.22.0.2", IRONIC_HOST_IP="172.22.0.2",
+                    IRONIC_NAMESPACE="baremetal-operator-system",
+                    ENABLE_TOR_DEMO="true" if enabled else "false",
+                )
+                subprocess.run(["bash", "-c", f"source {source}"], env=environment,
+                               capture_output=True, text=True, check=True)
+                cert = Path(workdir, "certs", "ironic.crt").read_text()
+                self.assertEqual(cert.count("BEGIN CERTIFICATE"), expected_certs)
+                san = subprocess.run(
+                    ["openssl", "x509", "-noout", "-ext", "subjectAltName"],
+                    input=cert, capture_output=True, text=True, check=True,
+                ).stdout
+                if enabled:
+                    self.assertIn(name, san)
+                else:
+                    self.assertNotIn("DNS:", san)
+
     def test_ovs_package_names(self):
         defaults = load_yaml(ROLES / "ovs/defaults/main.yml")
         environment = template_environment()
