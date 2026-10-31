@@ -119,7 +119,7 @@ networks: "{{ networks_nated if networks_nat_only else networks_mixed }}"
 enable_tor_demo: "{{ lookup('env', 'ENABLE_TOR_DEMO') | default('false', true) | bool }}"
 tor_demo_network:
 - name: tor-demo
-  bridge: labsw0
+  bridge: tor-switch
   forward_mode: bridge
   virtualport_type: openvswitch
   tor_demo: true

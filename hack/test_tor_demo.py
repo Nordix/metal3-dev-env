@@ -151,7 +151,7 @@ class TorDemoTests(unittest.TestCase):
                         self.assertEqual(nic.get("type"), "ethernet")
                         self.assertIsNone(nic.find("source"))
                         self.assertIsNone(nic.find("virtualport"))
-                        self.assertEqual(nic.find("target").get("dev"), f"m3tor{index}")
+                        self.assertEqual(nic.find("target").get("dev"), f"tor-port-{index}")
                         self.assertEqual(nic.find("target").get("managed"), "no")
 
         network_template = environment.from_string(
@@ -161,7 +161,7 @@ class TorDemoTests(unittest.TestCase):
             item=common["tor_demo_network"][0],
         ))
         self.assertEqual(document.find("forward").get("mode"), "bridge")
-        self.assertEqual(document.find("bridge").get("name"), "labsw0")
+        self.assertEqual(document.find("bridge").get("name"), "tor-switch")
         self.assertEqual(document.find("virtualport").get("type"), "openvswitch")
         self.assertIsNone(document.find("ip"))
         self.assertIsNone(document.find("vlan"))
@@ -272,7 +272,7 @@ BMO_IRONIC_ARGS=()
         script = environment.from_string(
             (ROLES / "libvirt/templates/metal3-tor-taps.sh.j2").read_text()
         ).render(vm_nodes=[{"name": "node_0"}, {"name": "node_1"}])
-        self.assertIn('TAPS=("m3tor0" "m3tor1")', script)
+        self.assertIn('TAPS=("tor-port-0" "tor-port-1")', script)
         self.assertIn("ovs-vsctl --may-exist add-port", script)
         self.assertIn("ip tuntap add", script)
 
@@ -283,7 +283,7 @@ BMO_IRONIC_ARGS=()
 
         teardown = load_yaml(ROLES / "libvirt/tasks/main.yml")[1]["block"]
         tap_cleanup = next(i for i, task in enumerate(teardown)
-                           if "m3tor" in str(task.get("shell", "")))
+                           if "tor-port-" in str(task.get("shell", "")))
         bridge_cleanup = next(i for i, task in enumerate(teardown)
                               if "del-br" in task.get("command", ""))
         self.assertLess(tap_cleanup, bridge_cleanup)

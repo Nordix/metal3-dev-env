@@ -81,7 +81,7 @@
 {% if network.tor_demo | default(false) %}
     <interface type='ethernet'>
       <mac address='{{ node_mac_map.get(item.name).get(network.name) }}'/>
-      <target dev='m3tor{{ vm_nodes.index(item) }}' managed='no'/>
+      <target dev='tor-port-{{ vm_nodes.index(item) }}' managed='no'/>
       <script path=''/>
       <model type='{{ libvirt_nic_model }}'/>
     </interface>

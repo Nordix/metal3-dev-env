@@ -19,7 +19,7 @@ the tap and loses the VLAN. Same-VLAN connectivity between the booted
 guests does not hold with OVS on the host. A separate virtual switch
 keeps the port configuration across guest reboots.
 
-This live demo uses two normal dev-env guests, one OVS bridge (`labsw0`),
+This live demo uses two normal dev-env guests, one OVS bridge (`tor-switch`),
 and a dedicated third NIC on each guest. BMO, Ironic, and
 networking-generic-switch configure the VM-facing OVS ports.
 Provisioning and external networking remain unchanged.
@@ -46,7 +46,7 @@ setup or delete the target cluster as an implicit prerequisite.
 VM1 demo NIC                         VM2 demo NIC
 10.30.0.11/24                         10.30.0.12/24
       |                                    |
-      +-- access VLAN 3 -- labsw0 -- access VLAN 3
+      +-- access VLAN 3 -- tor-switch -- access VLAN 3
 ```
 
 ## Prepare the environment
@@ -74,9 +74,9 @@ running the target-cluster provisioning scripts.
 Enabling the flag:
 
 1. Adds the `tor-demo` libvirt network and third NIC to every bare-metal VM.
-1. Installs OVS and creates `labsw0`, with a dev-env ownership marker.
+1. Installs OVS and creates `tor-switch`, with a dev-env ownership marker.
    Setup refuses to adopt an existing unmarked bridge with that name.
-1. Names the demo taps `m3tor0`, `m3tor1`, etc., in VM inventory order.
+1. Names the demo taps `tor-port-0`, `tor-port-1`, etc., in VM inventory order.
    Libvirt recreates these tap names when guests start.
 1. Enables BMO's `IronicNetworking` gate, switch Secret configuration, and
    `ironic-networking` interface, including for locally run BMO.
@@ -94,7 +94,7 @@ the provisioning network visible to Ironic's host-networked pod inside
 kind. Setup assigns the existing dev-env bootstrap address (normally
 `172.22.0.9/24`) so VRRP has a base address. Keepalived assigns the Ironic
 VIP (`172.22.0.2`); setup does not assign the VIP itself.
-This connection is separate from `labsw0` and the
+This connection is separate from `tor-switch` and the
 existing host-side `ironicendpoint`. Cluster cleanup removes the owned
 veth pair. Recreate the connection after replacing/restarting the kind
 container if its network namespace is replaced.
@@ -110,13 +110,13 @@ kubectl get baremetalhosts -A
 ```
 
 Guests must have completed inspection after their third NIC was added.
-Record each BMH name, namespace, demo NIC MAC, and `m3torN` port name.
+Record each BMH name, namespace, demo NIC MAC, and `tor-port-N` port name.
 Taps exist only while the guest is running.
 
 ## Allow switch management over SSH
 
 Use a host IP reachable from the networking pod, not an address on
-`labsw0`. Configure a dedicated lab SSH key and an account that can execute
+`tor-switch`. Configure a dedicated lab SSH key and an account that can execute
 `ovs-vsctl` directly with OVSDB access. The driver invokes `ovs-vsctl`;
 granting access only to `sudo ovs-vsctl` is not sufficient unless the
 driver is configured to invoke it that way.
@@ -140,7 +140,7 @@ configured `IRONIC_NAMESPACE` if different. IrSO creates
 Create only the input switch credentials Secret yourself:
 
 ```bash
-kubectl -n baremetal-operator-system create secret generic labsw0-creds \
+kubectl -n baremetal-operator-system create secret generic tor-switch-creds \
   --from-literal=username=YOUR_LAB_SSH_USER \
   --from-file=ssh-privatekey=/absolute/path/to/lab-private-key
 ```
@@ -153,14 +153,14 @@ and BMH mappings; this demo does not depend on LLDP.
 apiVersion: metal3.io/v1alpha1
 kind: BareMetalSwitch
 metadata:
-  name: labsw0
+  name: tor-switch
   namespace: baremetal-operator-system
 spec:
   address: HOST_IP_REACHABLE_FROM_POD
   macAddress: "00:00:5e:00:53:01"
   deviceType: netmiko_ovs_linux
   credentials:
-    name: labsw0-creds
+    name: tor-switch-creds
 ---
 apiVersion: metal3.io/v1alpha1
 kind: HostNetworkAttachment
@@ -188,7 +188,7 @@ spec:
         name: tenant-vlan3
       switchPort:
         switchID: "00:00:5e:00:53:01"
-        portID: m3tor0
+        portID: tor-port-0
 ```
 
 Wait for switch validation, BMH `NetworkInterfacesValid=True`, and matching
@@ -196,8 +196,8 @@ Wait for switch validation, BMH `NetworkInterfacesValid=True`, and matching
 `extra.switchport` and `local_link_connection`, and verify both OVS tags:
 
 ```bash
-sudo ovs-vsctl get Port m3tor0 tag
-sudo ovs-vsctl get Port m3tor1 tag
+sudo ovs-vsctl get Port tor-port-0 tag
+sudo ovs-vsctl get Port tor-port-1 tag
 ```
 
 Record the tags at this stage; they need not show `3` while the hosts use
@@ -331,7 +331,7 @@ verified BMO state gate does not reapply it while the host is provisioned.
 1. Remove only the demo entries from each BMH's `spec.networkInterfaces`
    when switch updates are permitted, then verify actual switch-port
    cleanup. Removing intent while provisioned does not prove cleanup.
-1. Delete the HNA, `labsw0` switch resource, and `labsw0-creds` input
+1. Delete the HNA, `tor-switch` switch resource, and `tor-switch-creds` input
    Secret from their namespaces after references have been removed.
 1. Remove the demo guest addresses/network profiles and SSH key
    authorization if retaining the guests.
@@ -339,7 +339,7 @@ verified BMO state gate does not reapply it while the host is provisioned.
    dev-env cleanup in the dedicated lab VM. It removes the guests and
    libvirt networks, then the owned OVS bridge.
 
-Cleanup refuses to remove an unmarked `labsw0`. It does not uninstall OVS,
+Cleanup refuses to remove an unmarked `tor-switch`. It does not uninstall OVS,
 delete unrelated bridges, or alter unrelated SSH accounts/keys. Keep the
 flag enabled until cleanup has completed.
 

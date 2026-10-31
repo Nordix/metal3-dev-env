@@ -30,8 +30,8 @@ it as a working demo yet.
 A mapping identifies the switch port connected to a NIC:
 
 ```text
-node-0 third NIC MAC 00:2b:d8:32:19:cf -> labsw0 -> m3tor0
-node-1 third NIC MAC 00:2b:d8:32:19:d3 -> labsw0 -> m3tor1
+node-0 third NIC MAC 00:2b:d8:32:19:cf -> tor-switch -> tor-port-0
+node-1 third NIC MAC 00:2b:d8:32:19:d3 -> tor-switch -> tor-port-1
 ```
 
 Ironic stores this identity in `local_link_connection`. VLAN intent is
@@ -205,7 +205,7 @@ fixed, and the one limitation that remains.
   with group read and write. A systemd drop-in on `ovsdb-server.service`
   re-applies the group and mode on each start. The SSH account `ubuntu`
   then runs `ovs-vsctl` read and write commands without `sudo`.
-- Switch credentials reach the pod. The operator creates `labsw0-creds`
+- Switch credentials reach the pod. The operator creates `tor-switch-creds`
   with the username and the SSH private key. BMO fills
   `ironic-switch-credentials` and `ironic-switch-config`. IrSO mounts both
   into the `ironic-networking` pod. The pod reaches the switch and runs
@@ -259,13 +259,13 @@ After the TLS fix, provisioning drove each node through cleaning. The
 networking service ran the expected commands on the switch:
 
 ```text
-ovs-vsctl set port m3tor0 vlan_mode=access
-ovs-vsctl set port m3tor0 tag=3
+ovs-vsctl set port tor-port-0 vlan_mode=access
+ovs-vsctl set port tor-port-0 tag=3
 ```
 
-The log reported `Successfully configured port m3tor0 on switch
+The log reported `Successfully configured port tor-port-0 on switch
 00:00:5e:00:53:01` and `update_port` returned `status: configured` with
-`native_vlan: 3`. The same happened for `m3tor1`. Both ports carried
+`native_vlan: 3`. The same happened for `tor-port-1`. Both ports carried
 access VLAN 3 at bind time. This is the first confirmed end-to-end run of
 the declarative switch configuration.
 

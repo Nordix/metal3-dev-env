@@ -61,7 +61,7 @@ trunk support, or manual OVS VLAN commands.
 VM1 third NIC                         VM2 third NIC
 10.30.0.11/24                          10.30.0.12/24
        |                                     |
-       +-- access VLAN 3 -- labsw0 -- access VLAN 3
+       +-- access VLAN 3 -- tor-switch -- access VLAN 3
 ```
 
 - Use the two normal dev-env guests and their dedicated third NICs.
@@ -95,7 +95,7 @@ delete the target cluster or restart setup implicitly.
 
 ## Demonstration
 
-1. Declare `BareMetalSwitch` for `labsw0` and its dedicated credentials.
+1. Declare `BareMetalSwitch` for `tor-switch` and its dedicated credentials.
 1. Create an access-mode `tenant-vlan3` HostNetworkAttachment in the BMH
    namespace with `nativeVLAN: 3`.
 1. Add only each third NIC's `networkInterfaces` entry, referencing the
