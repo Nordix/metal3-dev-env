@@ -2,11 +2,27 @@
 
 ## Current status
 
-This plan is not yet verified end-to-end. See the
-[lessons learned](demo/tor-lessons-learned.md) for confirmed lifecycle
-restrictions, the mapping failure, SSH diagnosis, and readiness checks.
+Switch programming is verified end-to-end. During provisioning, Ironic
+configured access VLAN 3 on both third-NIC ports through the full Metal3
+path. One TLS fix was required first, and one limitation remains. See the
+[lessons learned](demo/tor-lessons-learned.md) for the verified run, the
+TLS fix, the lifecycle notes, and the readiness checks.
+
+- Prerequisite fix: the conductor fails TLS verification to the
+  `ironic-networking` service until the Ironic certificate carries the
+  service DNS name in its SAN and the `cafile` trusts the real CA. Without
+  this fix, cleaning loops in `clean failed` and no switch port is
+  programmed.
+- Verified result: the networking service ran `ovs-vsctl set port
+  <port> vlan_mode=access` and `tag=3` and reported the port configured.
+- Remaining limitation: the switch port is the libvirt tap. A guest reboot
+  recreates the tap and loses the VLAN. Same-VLAN connectivity between the
+  booted guests does not hold with OVS on the host. A separate virtual
+  switch removes this limitation.
+
 Establish port mappings before hosts become available; tenant VLAN tags
-are not required to appear during the idle lifecycle.
+appear when the node binds the port during provisioning, not during the
+idle lifecycle.
 
 ## Purpose
 

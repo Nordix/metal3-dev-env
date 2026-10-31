@@ -1,0 +1,21 @@
+#!/bin/bash
+# Managed by metal3-dev-env ToR demo (ENABLE_TOR_DEMO). Do not edit.
+#
+# Create persistent, host-owned OVS ports on the labsw0 bridge, one per
+# bare-metal node. Each guest attaches its demo NIC to the matching tap
+# with libvirt managed='no', so libvirt never deletes the port. This keeps
+# the VLAN that Metal3 programs on the port across guest power cycles.
+# Without it, libvirt recreates the OVS port on each guest reboot and the
+# VLAN is lost.
+set -eu
+
+BRIDGE="labsw0"
+TAPS=({% for index in range(vm_nodes | length) %}"m3tor{{ index }}"{% if not loop.last %} {% endif %}{% endfor %})
+
+for tap in "${TAPS[@]}"; do
+    if ! ip link show "${tap}" >/dev/null 2>&1; then
+        ip tuntap add dev "${tap}" mode tap
+    fi
+    ip link set "${tap}" up
+    ovs-vsctl --may-exist add-port "${BRIDGE}" "${tap}"
+done

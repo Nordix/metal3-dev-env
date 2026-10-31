@@ -1,0 +1,12 @@
+[Unit]
+Description=metal3-dev-env ToR demo persistent OVS switch ports
+After=ovsdb-server.service ovs-vswitchd.service
+Wants=ovs-vswitchd.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/metal3-tor-taps.sh
+
+[Install]
+WantedBy=multi-user.target

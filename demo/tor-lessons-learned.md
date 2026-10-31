@@ -191,3 +191,112 @@ Do not manually set VLAN tags to make the demonstration pass. BMO
 validation, IrSO switch reconciliation, or applied status alone does not
 prove switch programming. Teardown, firewall changes, SSH edits, and
 provisioning require explicit operational approval.
+
+## End-to-end run: switch programming verified (2026-10-31)
+
+A later run completed the switch programming end to end. Ironic
+configured access VLAN 3 on both third-NIC ports through the full Metal3
+path. This section records the steps that worked, the blocker that was
+fixed, and the one limitation that remains.
+
+### What worked
+
+- Non-root `ovs-vsctl`. A dedicated `ovsdb` group owns the OVSDB socket
+  with group read and write. A systemd drop-in on `ovsdb-server.service`
+  re-applies the group and mode on each start. The SSH account `ubuntu`
+  then runs `ovs-vsctl` read and write commands without `sudo`.
+- Switch credentials reach the pod. The operator creates `labsw0-creds`
+  with the username and the SSH private key. BMO fills
+  `ironic-switch-credentials` and `ironic-switch-config`. IrSO mounts both
+  into the `ironic-networking` pod. The pod reaches the switch and runs
+  `ovs-vsctl` over SSH.
+- Ironic accepts the mapping while `manageable`. A direct port PATCH of
+  `local_link_connection` returned HTTP 200. The earlier rejection was
+  state-dependent, not a switch-access failure.
+- BMO accepts the intent while `available`. Both BMHs reported
+  `NetworkInterfacesValid=True` with no rejection. BMO recorded the VLAN
+  intent in the Ironic port `extra.switchport` and did not change the
+  protected `local_link_connection`. This avoided the identity-change
+  gate that failed before.
+
+### The real blocker: conductor-to-networking-service TLS
+
+Applying switch intent triggers cleaning. Cleaning binds the port through
+the networking service. The conductor connects to
+`ironic-networking-service.<namespace>.svc:6190` in the
+`[ironic_networking_json_rpc]` section with `insecure = false`. This
+connection failed TLS verification and the node looped in `clean failed`.
+Two faults caused the failure:
+
+- The `cafile` is the server leaf certificate, not the issuing CA. The
+  real CA is in the `ironic-cacert` secret. Verification cannot build the
+  chain (`Verify return code: 21`).
+- The leaf certificate has only `IP:172.22.0.2` in its SAN. The conductor
+  connects by the service DNS name, which is absent from the certificate.
+
+This path exists only when `ENABLE_TOR_DEMO=true` enables the networking
+service. Normal dev-env runs never create it, so earlier tests never hit
+this fault. The main Ironic API avoids it because clients reach it by the
+IP that matches the SAN.
+
+Setting `[ironic_networking_json_rpc] insecure = true` through the Ironic
+CR `extraConfig` did not work. IrSO regenerates the section and keeps
+`insecure = false`.
+
+The fix re-issues the leaf certificate with the same `ironic CA`. The new
+certificate adds the service DNS names and the service ClusterIPs to the
+SAN and keeps `IP:172.22.0.2`. The `ironic-cert` secret `tls.crt` becomes
+a bundle of the leaf plus the CA, so the `cafile` can build the chain.
+After a pod restart, verification returned code 0 and cleaning succeeded.
+
+The proper fix belongs upstream. IrSO must mount the real CA as the
+`cafile` and must issue the networking-service certificate with a SAN for
+the service DNS name.
+
+### Confirmed switch programming
+
+After the TLS fix, provisioning drove each node through cleaning. The
+networking service ran the expected commands on the switch:
+
+```text
+ovs-vsctl set port m3tor0 vlan_mode=access
+ovs-vsctl set port m3tor0 tag=3
+```
+
+The log reported `Successfully configured port m3tor0 on switch
+00:00:5e:00:53:01` and `update_port` returned `status: configured` with
+`native_vlan: 3`. The same happened for `m3tor1`. Both ports carried
+access VLAN 3 at bind time. This is the first confirmed end-to-end run of
+the declarative switch configuration.
+
+### The remaining limitation: VLAN is lost on guest reboot
+
+The switch port in this setup is the libvirt tap. libvirt removes and
+re-adds the OVS port on each guest reboot. The recreated port has no VLAN.
+After each node finished deploy and rebooted into the provisioned OS, the
+tap was recreated and the VLAN tag was gone. No component re-applies the
+VLAN while the host is `provisioned`. This matches the earlier warning
+that tap recreation loses VLAN state.
+
+The result: the switch-config mechanism is demonstrable, but same-VLAN
+connectivity between the booted guests does not hold with OVS on the host.
+
+### Recommendation: use a separate virtual switch
+
+The persistence problem comes from coupling the switch port to the guest
+VM lifecycle. A separate virtual switch decouples them. The switch port
+then belongs to the switch, not to the libvirt tap, so a guest reboot
+does not remove the VLAN.
+
+- A virtual switch appliance keeps port configuration across guest
+  reboots. It also advertises LLDP, which removes the manual `switchPort`
+  mapping, and it offers a real switch CLI for the audience.
+- The installed `networking-generic-switch` drivers include `arista`,
+  `cumulus`, `sonic`, `nokia`, `juniper`, `cisco`, and `dell`. Arista
+  cEOS or SONiC are container-friendly candidates.
+- The cost is image acquisition, link wiring, LLDP setup, and management
+  access. The Metal3, BMO, and Ironic control path does not change.
+
+A lighter option keeps OVS and adds a reconciler. The reconciler watches
+for OVS port recreation and re-applies the VLAN. This is less realistic
+than a virtual switch, but it needs less setup.

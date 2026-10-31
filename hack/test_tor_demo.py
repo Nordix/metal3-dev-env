@@ -148,10 +148,11 @@ class TorDemoTests(unittest.TestCase):
                         self.assertIsNone(nic.find("virtualport"))
                     if enabled:
                         nic = interfaces[2]
-                        self.assertEqual(nic.find("source").get("bridge"), "labsw0")
-                        self.assertEqual(nic.find("virtualport").get("type"),
-                                         "openvswitch")
+                        self.assertEqual(nic.get("type"), "ethernet")
+                        self.assertIsNone(nic.find("source"))
+                        self.assertIsNone(nic.find("virtualport"))
                         self.assertEqual(nic.find("target").get("dev"), f"m3tor{index}")
+                        self.assertEqual(nic.find("target").get("managed"), "no")
 
         network_template = environment.from_string(
             (ROLES / "libvirt/templates/network.xml.j2").read_text()
@@ -265,6 +266,28 @@ BMO_IRONIC_ARGS=()
                               if "del-br" in task.get("command", ""))
         self.assertLess(vm_cleanup, bridge_cleanup)
         self.assertIn("enable_tor_demo", teardown[bridge_cleanup]["when"])
+
+    def test_persistent_tap_setup_and_cleanup(self):
+        environment = template_environment()
+        script = environment.from_string(
+            (ROLES / "libvirt/templates/metal3-tor-taps.sh.j2").read_text()
+        ).render(vm_nodes=[{"name": "node_0"}, {"name": "node_1"}])
+        self.assertIn('TAPS=("m3tor0" "m3tor1")', script)
+        self.assertIn("ovs-vsctl --may-exist add-port", script)
+        self.assertIn("ip tuntap add", script)
+
+        setup = load_yaml(ROLES / "libvirt/tasks/network_setup_tasks.yml")[0]["block"]
+        include = next(task for task in setup
+                       if task.get("include_tasks") == "tor_demo_taps.yml")
+        self.assertIn("enable_tor_demo", include["when"])
+
+        teardown = load_yaml(ROLES / "libvirt/tasks/main.yml")[1]["block"]
+        tap_cleanup = next(i for i, task in enumerate(teardown)
+                           if "m3tor" in str(task.get("shell", "")))
+        bridge_cleanup = next(i for i, task in enumerate(teardown)
+                              if "del-br" in task.get("command", ""))
+        self.assertLess(tap_cleanup, bridge_cleanup)
+        self.assertIn("enable_tor_demo", teardown[tap_cleanup]["when"])
 
     def test_ovs_package_names(self):
         defaults = load_yaml(ROLES / "ovs/defaults/main.yml")

@@ -1,9 +1,23 @@
 # ToR networking demo
 
-This workflow has not been verified end-to-end. Read the
-[lessons learned](tor-lessons-learned.md) before running it: our late
-mapping update was rejected, and switch SSH authentication remains
-unverified. Correct port mappings must exist before hosts become available.
+This workflow is verified end-to-end for switch programming. During
+provisioning, Ironic configured access VLAN 3 on both third-NIC ports.
+Read the [lessons learned](tor-lessons-learned.md) before running it: it
+records the required TLS fix, the verified run, and the persistence
+limitation. Switch SSH authentication is verified. The earlier mapping
+rejection was state-dependent, not a switch-access failure. Supply the
+port mapping through `switchPort` while the host is `available`.
+
+Prerequisite: the conductor must verify TLS to the `ironic-networking`
+service. The Ironic certificate must carry the service DNS name in its
+SAN, and the `cafile` must trust the real CA. Without this fix, cleaning
+loops in `clean failed` and no switch port is programmed. See the lessons
+learned for the fix.
+
+Limitation: the switch port is the libvirt tap. A guest reboot recreates
+the tap and loses the VLAN. Same-VLAN connectivity between the booted
+guests does not hold with OVS on the host. A separate virtual switch
+keeps the port configuration across guest reboots.
 
 This live demo uses two normal dev-env guests, one OVS bridge (`labsw0`),
 and a dedicated third NIC on each guest. BMO, Ironic, and

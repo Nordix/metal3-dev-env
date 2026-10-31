@@ -1,0 +1,29 @@
+---
+# ToR demo: create persistent host-owned OVS switch ports (taps) so the
+# VLAN that Metal3 programs survives guest VM power cycles. libvirt
+# attaches each guest demo NIC to the matching tap with managed='no' and
+# never deletes it. A systemd oneshot service recreates the taps on host
+# boot so they also survive host reboots.
+- name: Install the ToR demo persistent-tap script
+  template:
+    src: ../templates/metal3-tor-taps.sh.j2
+    dest: /usr/local/sbin/metal3-tor-taps.sh
+    owner: root
+    mode: '0755'
+  become: true
+
+- name: Install the ToR demo persistent-tap service
+  template:
+    src: ../templates/metal3-tor-taps.service.j2
+    dest: /etc/systemd/system/metal3-tor-taps.service
+    owner: root
+    mode: '0644'
+  become: true
+
+- name: Enable and start the ToR demo persistent-tap service
+  systemd:
+    name: metal3-tor-taps.service
+    daemon_reload: true
+    enabled: true
+    state: restarted
+  become: true

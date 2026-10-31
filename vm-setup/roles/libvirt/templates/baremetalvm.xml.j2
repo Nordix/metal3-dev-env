@@ -78,6 +78,14 @@
     </tpm>
 {% endif %}
 {% for network in networks %}
+{% if network.tor_demo | default(false) %}
+    <interface type='ethernet'>
+      <mac address='{{ node_mac_map.get(item.name).get(network.name) }}'/>
+      <target dev='m3tor{{ vm_nodes.index(item) }}' managed='no'/>
+      <script path=''/>
+      <model type='{{ libvirt_nic_model }}'/>
+    </interface>
+{% else %}
     <interface type='bridge'>
       <mac address='{{ node_mac_map.get(item.name).get(network.name) }}'/>
       <source bridge='{{ network.bridge }}'/>
@@ -85,10 +93,8 @@
 {% if network.virtualport_type is defined %}
       <virtualport type='{{ network.virtualport_type }}'/>
 {% endif %}
-{% if network.tor_demo | default(false) %}
-      <target dev='m3tor{{ vm_nodes.index(item) }}'/>
-{% endif %}
     </interface>
+{% endif %}
 {% endfor %}
     <serial type='pty'>
       <log file="{{ libvirt_log_path }}/{{ item.name }}-serial0.log" append="on"/>

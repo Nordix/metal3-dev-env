@@ -33,6 +33,12 @@
     with_items: "{{ networks }}"
     become: true
 
+  # Create persistent, host-owned OVS switch ports so the VLAN that Metal3
+  # programs survives guest VM power cycles.
+  - name: Create ToR demo persistent switch ports
+    include_tasks: tor_demo_taps.yml
+    when: enable_tor_demo
+
 # TODO(apuimedo) drop this back to vm tasks once we have proper DNS
 - name: get a list of MACs to use
   include_tasks: ../../common/tasks/generate_node_mac.yml
