@@ -220,3 +220,11 @@
 
 # Whether to use ironic-standalone-operator to deploy Ironic.
 # export USE_IRSO="true"
+
+# Optional BMO feature gates, for example "HostClaims=true".
+# export BMO_FEATURE_GATES=""
+
+# Add a third NIC on the isolated labsw0 OVS bridge to each libvirt node.
+# Requires USE_IRSO=true and at least two nodes. Enables IronicNetworking.
+# See demo/tor-networking.md before running the live demo.
+# export ENABLE_TOR_DEMO="true"

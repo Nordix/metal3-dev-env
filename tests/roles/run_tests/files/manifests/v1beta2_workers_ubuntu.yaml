@@ -1,0 +1,158 @@
+apiVersion: cluster.x-k8s.io/v1beta2
+kind: MachineDeployment
+metadata:
+  labels:
+    cluster.x-k8s.io/cluster-name: test1
+    nodepool: nodepool-0
+  name: test1
+  namespace: metal3
+spec:
+  clusterName: test1
+  replicas: 1
+  selector:
+    matchLabels:
+      cluster.x-k8s.io/cluster-name: test1
+      nodepool: nodepool-0
+  template:
+    metadata:
+      labels:
+        cluster.x-k8s.io/cluster-name: test1
+        nodepool: nodepool-0
+    spec:
+      bootstrap:
+        configRef:
+          apiGroup: bootstrap.cluster.x-k8s.io
+          kind: KubeadmConfigTemplate
+          name: test1-workers
+      clusterName: test1
+      deletion:
+        nodeDrainTimeoutSeconds: 0
+      infrastructureRef:
+        apiGroup: infrastructure.cluster.x-k8s.io
+        kind: Metal3MachineTemplate
+        name: test1-workers
+      version: v1.37.0
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+kind: Metal3MachineTemplate
+metadata:
+  name: test1-workers
+  namespace: metal3
+spec:
+  template:
+    spec:
+      dataTemplate:
+        name: test1-workers-template
+      image:
+        checksum: http://172.22.0.1/images/UBUNTU_24.04_NODE_IMAGE_K8S_v1.37.0-raw.img.sha256sum
+        checksumType: sha256
+        diskFormat: raw
+        url: http://172.22.0.1/images/UBUNTU_24.04_NODE_IMAGE_K8S_v1.37.0-raw.img
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+kind: Metal3DataTemplate
+metadata:
+  name: test1-workers-template
+  namespace: metal3
+spec:
+  clusterName: test1
+  metaData:
+    ipAddressesFromPool:
+    - key: provisioningIP
+      name: provisioning-pool
+    objectNames:
+    - key: name
+      object: machine
+    - key: local-hostname
+      object: machine
+    - key: local_hostname
+      object: machine
+    prefixesFromPool:
+    - key: provisioningCIDR
+      name: provisioning-pool
+  networkData:
+    links:
+      ethernets:
+      - id: enp1s0
+        macAddress:
+          fromHostInterface: enp1s0
+        type: phy
+      - id: enp2s0
+        macAddress:
+          fromHostInterface: enp2s0
+        type: phy
+      - id: enp3s0
+        macAddress:
+          fromHostInterface: enp3s0
+        type: phy
+    networks:
+      ipv4:
+      - id: externalv4
+        ipAddressFromIPPool: externalv4-pool
+        link: enp2s0
+        routes:
+        - gateway:
+            fromIPPool: externalv4-pool
+          network: 0.0.0.0
+          prefix: 0
+    services:
+      dns:
+      - 8.8.8.8
+---
+apiVersion: bootstrap.cluster.x-k8s.io/v1beta2
+kind: KubeadmConfigTemplate
+metadata:
+  name: test1-workers
+  namespace: metal3
+spec:
+  template:
+    spec:
+      files:
+      - content: |
+          network:
+            version: 2
+            renderer: networkd
+            bridges:
+              ironicendpoint:
+                interfaces: [enp1s0]
+                addresses:
+                - {{ ds.meta_data.provisioningIP }}/{{ ds.meta_data.provisioningCIDR }}
+        owner: root:root
+        path: /etc/netplan/52-ironicendpoint.yaml
+        permissions: "0600"
+      - content: |
+          [registries.search]
+          registries = ['docker.io']
+
+          [registries.insecure]
+          registries = ['192.168.111.1:5000']
+        path: /etc/containers/registries.conf
+      joinConfiguration:
+        nodeRegistration:
+          kubeletExtraArgs:
+          - name: node-labels
+            value: metal3.io/uuid={{ ds.meta_data.uuid }}
+          - name: provider-id
+            value: metal3://{{ ds.meta_data.providerid }}
+          - name: feature-gates
+            value: AllAlpha=false
+          - name: cgroup-driver
+            value: systemd
+          - name: container-runtime-endpoint
+            value: unix:///var/run/crio/crio.sock
+          - name: runtime-request-timeout
+            value: 5m
+          name: '{{ ds.meta_data.name }}'
+      preKubeadmCommands:
+      - sed -i "s/MACAddressPolicy=persistent/MACAddressPolicy=none/g" /usr/lib/systemd/network/99-default.link
+      - netplan apply
+      - systemctl enable --now crio
+      - sleep 30
+      - systemctl enable --now kubelet
+      - sleep 120
+      users:
+      - name: metal3
+        sshAuthorizedKeys:
+        - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF9Zd3gyARkCiokVVQGe6K4oXixGoqHPMb4bEwzIWuKV
+          metal3ci@sunnat-tor-demo
+        sudo: ALL=(ALL) NOPASSWD:ALL

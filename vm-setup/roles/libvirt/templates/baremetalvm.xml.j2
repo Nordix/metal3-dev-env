@@ -85,6 +85,9 @@
 {% if network.virtualport_type is defined %}
       <virtualport type='{{ network.virtualport_type }}'/>
 {% endif %}
+{% if network.tor_demo | default(false) %}
+      <target dev='m3tor{{ vm_nodes.index(item) }}'/>
+{% endif %}
     </interface>
 {% endfor %}
     <serial type='pty'>

@@ -23,6 +23,13 @@
     var: vm_nodes
   when: generate_vm_nodes
 
+- name: Append the isolated ToR demo network
+  set_fact:
+    networks: "{{ networks + tor_demo_network }}"
+  when:
+  - enable_tor_demo
+  - "'tor-demo' not in (networks | map(attribute='name') | list)"
+
 - name: "Check if EXTRA_NETWORK_NAMES is configured"
   set_fact:
     generate_extra_networks: "{{lookup('env', 'EXTRA_NETWORK_NAMES') and extra_networks is not defined}}"

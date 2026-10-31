@@ -115,3 +115,11 @@ networks_nated: "{{ provisioning_network_nat + external_network }}"
 networks_nat_only: "{{ lookup('env', 'ENABLE_NATED_PROVISIONING_NETWORK') | bool }}"
 # Placeholder for the eventually selected network composition
 networks: "{{ networks_nated if networks_nat_only else networks_mixed }}"
+
+enable_tor_demo: "{{ lookup('env', 'ENABLE_TOR_DEMO') | default('false', true) | bool }}"
+tor_demo_network:
+- name: tor-demo
+  bridge: labsw0
+  forward_mode: bridge
+  virtualport_type: openvswitch
+  tor_demo: true

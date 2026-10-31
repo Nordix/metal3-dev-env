@@ -4,9 +4,12 @@ set -eux
 
 # shellcheck disable=SC1091
 source lib/common.sh
+# shellcheck disable=SC1091
+source lib/kind_network.sh
 
 # Delete cluster
 if [[ "${BOOTSTRAP_CLUSTER}" = "kind" ]] || [[ "${BOOTSTRAP_CLUSTER}" = "tilt" ]]; then
+    remove_kind_irso_network
     sudo su -l -c "kind delete cluster  || true" "${USER}"
     # Kill and remove the running ironic containers
     if [[ -x "${BMOPATH}/tools/remove_local_ironic.sh" ]]; then

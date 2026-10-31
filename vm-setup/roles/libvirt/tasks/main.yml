@@ -11,4 +11,22 @@
   - include_tasks: network_teardown_tasks.yml
   - include_tasks: vm_teardown_tasks.yml
     when: vm_platform == "libvirt"
+  - name: Check ownership before removing the ToR demo bridge
+    command: ovs-vsctl --if-exists get Bridge labsw0 external_ids
+    register: tor_demo_bridge_ids
+    changed_when: false
+    when: enable_tor_demo
+  - name: Refuse to remove an unrelated OVS bridge
+    assert:
+      that:
+      - >-
+        tor_demo_bridge_ids.stdout == '' or
+        (tor_demo_bridge_ids.stdout | replace('"', '') |
+        regex_search('(^|[,{ ])metal3-dev-env=tor-demo([,} ]|$)')) is not none
+      fail_msg: "Refusing to delete labsw0 without the metal3-dev-env=tor-demo ownership marker"
+    when: enable_tor_demo
+  - name: Remove the ToR demo bridge after its VMs
+    command: ovs-vsctl --if-exists del-br labsw0
+    when: enable_tor_demo and tor_demo_bridge_ids.stdout != ''
+    become: true
   when: libvirt_action == "teardown"

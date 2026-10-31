@@ -7,11 +7,28 @@
     include_role:
       name: 'ovs'
 
+  - name: Check ownership of the ToR demo bridge
+    command: ovs-vsctl --if-exists get Bridge labsw0 external_ids
+    register: tor_demo_bridge_ids
+    changed_when: false
+    when: enable_tor_demo
+
+  - name: Refuse to reuse an unrelated OVS bridge
+    assert:
+      that:
+      - >-
+        tor_demo_bridge_ids.stdout == '' or
+        (tor_demo_bridge_ids.stdout | replace('"', '') |
+        regex_search('(^|[,{ ])metal3-dev-env=tor-demo([,} ]|$)')) is not none
+      fail_msg: "labsw0 already exists without the metal3-dev-env=tor-demo ownership marker"
+    when: enable_tor_demo
+
   # Create any OVS Bridges that have been defined
   - name: Create OVS Bridges
     openvswitch_bridge:
       bridge: "{{ item.bridge }}"
       state: present
+      external_ids: "{{ {'metal3-dev-env': 'tor-demo'} if item.tor_demo | default(false) else omit }}"
     when: item.virtualport_type is defined and item.virtualport_type == "openvswitch"
     with_items: "{{ networks }}"
     become: true

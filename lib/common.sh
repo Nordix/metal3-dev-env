@@ -262,6 +262,8 @@ fi
 
 export BMO_RUN_LOCAL="${BMO_RUN_LOCAL:-false}"
 export CAPM3_RUN_LOCAL="${CAPM3_RUN_LOCAL:-false}"
+export BMO_FEATURE_GATES="${BMO_FEATURE_GATES:-}"
+export ENABLE_TOR_DEMO="${ENABLE_TOR_DEMO:-false}"
 
 export WORKING_DIR="${WORKING_DIR:-/opt/metal3-dev-env}"
 export NODES_FILE="${NODES_FILE:-${WORKING_DIR}/ironic_nodes.json}"
@@ -398,6 +400,36 @@ if [[ "${CONTAINER_RUNTIME}" = "docker" ]]; then
   export BOOTSTRAP_CLUSTER=${BOOTSTRAP_CLUSTER:-"kind"}
 else
   export BOOTSTRAP_CLUSTER="minikube"
+fi
+
+if [[ "${ENABLE_TOR_DEMO}" != "true" && "${ENABLE_TOR_DEMO}" != "false" ]]; then
+  echo "ERROR: ENABLE_TOR_DEMO must be true or false" >&2
+  exit 1
+fi
+if [[ "${ENABLE_TOR_DEMO}" == "true" ]]; then
+  if [[ "${USE_IRSO}" != "true" || "${NODES_PLATFORM}" != "libvirt" ||
+        ( "${BOOTSTRAP_CLUSTER}" != "kind" && "${BOOTSTRAP_CLUSTER}" != "minikube" ) ]]; then
+    echo "ERROR: the ToR demo requires USE_IRSO=true, NODES_PLATFORM=libvirt, and kind or minikube" >&2
+    exit 1
+  fi
+  if [[ ! "${NUM_NODES}" =~ ^[0-9]+$ ]] || (( 10#${NUM_NODES} < 2 )); then
+    echo "ERROR: the ToR demo requires at least two nodes" >&2
+    exit 1
+  fi
+  if [[ ",${BMO_FEATURE_GATES}," == *",IronicNetworking=false,"* ]]; then
+    echo "ERROR: the ToR demo requires IronicNetworking=true" >&2
+    exit 1
+  fi
+  if [[ ",${BMO_FEATURE_GATES}," != *",IronicNetworking=true,"* ]]; then
+    export BMO_FEATURE_GATES="${BMO_FEATURE_GATES:+${BMO_FEATURE_GATES},}IronicNetworking=true"
+  fi
+  export IRONIC_SWITCH_CONFIGS_SECRET="ironic-switch-config"
+  export IRONIC_SWITCH_CREDENTIALS_SECRET="ironic-switch-credentials"
+  export IRONIC_SWITCH_CREDENTIALS_PATH="/etc/ironic/networking/credentials"
+  export IRONIC_NETWORK_INTERFACE="ironic-networking"
+fi
+if [[ -n "${BMO_FEATURE_GATES}" ]]; then
+  export FEATURE_GATES="${BMO_FEATURE_GATES}"
 fi
 
 # Kubectl version - SHA256 is downloaded and verified

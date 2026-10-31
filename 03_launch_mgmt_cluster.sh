@@ -10,6 +10,8 @@ source lib/common.sh
 source lib/releases.sh
 # shellcheck disable=SC1091
 source lib/network.sh
+# shellcheck disable=SC1091
+source lib/kind_network.sh
 
 # Default CAPI_CONFIG_DIR to ${HOME}/.config directory if XDG_CONFIG_HOME not set
 CONFIG_DIR="${XDG_CONFIG_HOME:-${HOME}/.config}"
@@ -79,6 +81,19 @@ EOF
 
     if [[ -n "${DEPLOY_ISO_URL}" ]]; then
         echo "DEPLOY_ISO_URL=${DEPLOY_ISO_URL}" | sudo tee -a "${BMOPATH}/config/default/ironic.env"
+    fi
+
+    if [[ -n "${BMO_FEATURE_GATES}" ]]; then
+        echo "FEATURE_GATES=${BMO_FEATURE_GATES}" | sudo tee -a "${BMOPATH}/config/default/ironic.env"
+    fi
+    if [[ "${ENABLE_TOR_DEMO}" == "true" ]]; then
+        cat << EOF | sudo tee -a "${BMOPATH}/config/default/ironic.env"
+IRONIC_NAMESPACE=${IRONIC_NAMESPACE}
+IRONIC_NETWORK_INTERFACE=${IRONIC_NETWORK_INTERFACE}
+IRONIC_SWITCH_CONFIGS_SECRET=${IRONIC_SWITCH_CONFIGS_SECRET}
+IRONIC_SWITCH_CREDENTIALS_SECRET=${IRONIC_SWITCH_CREDENTIALS_SECRET}
+IRONIC_SWITCH_CREDENTIALS_PATH=${IRONIC_SWITCH_CREDENTIALS_PATH}
+EOF
     fi
 
     # Deploy BMO using deploy.sh script
@@ -274,6 +289,13 @@ EOF
 EOF
     fi
 
+    if [[ "${ENABLE_TOR_DEMO}" == "true" ]]; then
+        cat >> "${ironic}" <<EOF
+  networkingService:
+    enabled: true
+EOF
+    fi
+
     if [[ -r "${IRONIC_CERT_FILE}" ]] && [[ -r "${IRONIC_KEY_FILE}" ]]; then
         kubectl create secret tls ironic-cert -n "${IRONIC_NAMESPACE}" --key="${IRONIC_KEY_FILE}" --cert="${IRONIC_CERT_FILE}"
         kubectl label secret ironic-cert -n "${IRONIC_NAMESPACE}" \
@@ -321,6 +343,11 @@ EOF
             kubectl get -n "${IRONIC_NAMESPACE}" -o yaml ironicdatabase/ironic-db
         fi
         exit 1
+    fi
+
+    if [[ "${ENABLE_TOR_DEMO}" == "true" ]]; then
+        kubectl -n "${IRONIC_NAMESPACE}" rollout status deployment/ironic-networking \
+            --timeout="${IRONIC_ROLLOUT_WAIT}m"
     fi
 }
 
@@ -716,6 +743,9 @@ start_management_cluster()
 {
     if [[ "${BOOTSTRAP_CLUSTER}" = "kind" ]]; then
         launch_kind
+        if [[ "${USE_IRSO}" == "true" ]]; then
+            configure_kind_irso_network
+        fi
     elif [[ "${BOOTSTRAP_CLUSTER}" = "minikube" ]]; then
         # This method, defined in lib/common.sh, will either ensure sockets are up'n'running
         # for CS9 and RHEL9, or restart the libvirtd.service for other DISTRO
