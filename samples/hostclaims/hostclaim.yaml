@@ -1,0 +1,22 @@
+# Lives in the TENANT namespace ("team-a"). It selects and binds a BareMetalHost.
+# The target host must be in state "available" and carry the matching labels.
+# The dev-env BMHs (node-0, node-1 in "test") have no labels by default.
+# Label a host first, for example:
+#   kubectl -n test label bmh node-0 hardware.metal3.io/class=compute
+apiVersion: metal3.io/v1alpha1
+kind: HostClaim
+metadata:
+  name: web-01
+  namespace: team-a
+spec:
+  poweredOn: true                     # required by the schema; not acted on yet
+  hostSelector:
+    matchLabels:
+      hardware.metal3.io/class: compute
+    # matchExpressions:
+    #   - key: hardware.metal3.io/cpu
+    #     operator: In
+    #     values: ["high"]
+    inNamespace: test                 # restrict the search to the host namespace
+  # failureDomain: rack-a             # prefer hosts labeled
+                                      # infrastructure.cluster.x-k8s.io/failure-domain=rack-a

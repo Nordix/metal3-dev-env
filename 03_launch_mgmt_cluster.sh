@@ -81,6 +81,11 @@ EOF
         echo "DEPLOY_ISO_URL=${DEPLOY_ISO_URL}" | sudo tee -a "${BMOPATH}/config/default/ironic.env"
     fi
 
+    # Enable BMO feature gates (e.g. HostClaims=true) when requested
+    if [[ -n "${BMO_FEATURE_GATES}" ]]; then
+        echo "FEATURE_GATES=${BMO_FEATURE_GATES}" | sudo tee -a "${BMOPATH}/config/default/ironic.env"
+    fi
+
     # Deploy BMO using deploy.sh script
     "${BMOPATH}/tools/deploy.sh" -b "${BMO_IRONIC_ARGS[@]}"
 

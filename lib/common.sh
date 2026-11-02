@@ -262,6 +262,7 @@ fi
 
 export BMO_RUN_LOCAL="${BMO_RUN_LOCAL:-false}"
 export CAPM3_RUN_LOCAL="${CAPM3_RUN_LOCAL:-false}"
+export BMO_FEATURE_GATES="${BMO_FEATURE_GATES:-}"
 
 export WORKING_DIR="${WORKING_DIR:-/opt/metal3-dev-env}"
 export NODES_FILE="${NODES_FILE:-${WORKING_DIR}/ironic_nodes.json}"

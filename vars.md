@@ -27,6 +27,7 @@ assured that they are persisted.
 | LOCAL_CONTAINER_PLATFORM | Locally built containers will be built for this os/arch platform | any string that is acceptable by the --platform flag of either docker or podman | "linux/amd64" |
 | LOCAL_IPA_PATH | This has effect only when USE_LOCAL_IPA is set to "true", points to the directory where the IPA archive is located. This variable is handled by BMO. | "arbitrary directory path" | "" |
 | BMO_RUN_LOCAL | Run a local baremetal operator instead of deploying in Kubernetes | "true", "false" | "false" |
+| BMO_FEATURE_GATES | Comma-separated BMO feature gates written to the ironic ConfigMap as FEATURE_GATES. Enables alpha features such as HostClaims. | "HostClaims=true", "HostClaims=true,IronicNetworking=true" | "" |
 | CAPM3_RUN_LOCAL | Run a local CAPM3 operator instead of deploying in Kubernetes | "true", "false" | "false" |
 | SKIP_RETRIES | Do not retry on failure during verifications or tests of the environment. This should be false. It could only be set to false for verifications of a dev env deployment that fully completed. Otherwise failures will appear as resources are not ready. | "true", "false" | "false" |
 | SKIP_APPLY_BMH | Do not apply the BMHs. used usually when the BMHs will be applied later in the tests. | "true", "false" | "false" |
