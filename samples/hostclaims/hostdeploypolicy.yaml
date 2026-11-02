@@ -1,18 +1,13 @@
-# Lives in the HOST namespace (where the BareMetalHosts are: "test").
-# It allows claim namespaces to bind hosts in this namespace.
-# Without a policy, no HostClaim can bind a host here.
 apiVersion: metal3.io/v1alpha1
 kind: HostDeployPolicy
 metadata:
-  name: allow-team-a
-  namespace: test
+  name: allow-blue-team
+  namespace: bmh-pool-ns
 spec:
   hostClaimNamespaces:
-    # Any of these three constraints may be set.
-    # All constraints that are set must match (AND).
     names:
-      - team-a
-    # nameMatches: "^team-.*$"
+      - blue-team
+    # nameMatches: "^blue-.*$"
     # hasLabels:
     #   - name: metal3.io/tenant
     #     value: "true"
