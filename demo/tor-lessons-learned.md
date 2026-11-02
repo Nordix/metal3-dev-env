@@ -1,7 +1,8 @@
 # ToR networking demo: lessons learned
 
-Findings recorded on 2026-10-31. This is an investigation record, not a
-verified end-to-end runbook.
+Findings recorded on 2026-10-31. The flow is now verified end to end in
+our lab (see the end-to-end section below). This document keeps the full
+investigation record, including the faults found and the fixes applied.
 
 ## What we want to demonstrate
 
@@ -22,8 +23,9 @@ Inspect host and discover mapping
 Guest IP configuration is separate from switch VLAN configuration.
 Provisioning and external NICs must remain unchanged.
 
-This flow has not passed an end-to-end test in our lab. We must not present
-it as a working demo yet.
+This flow has now passed an end-to-end test in our lab. The section
+"End-to-end run" below records the verified result and the fixes it
+required.
 
 ## Mapping and VLAN intent are different
 
@@ -249,9 +251,14 @@ SAN and keeps `IP:172.22.0.2`. The `ironic-cert` secret `tls.crt` becomes
 a bundle of the leaf plus the CA, so the `cafile` can build the chain.
 After a pod restart, verification returned code 0 and cleaning succeeded.
 
-The proper fix belongs upstream. IrSO must mount the real CA as the
-`cafile` and must issue the networking-service certificate with a SAN for
-the service DNS name.
+dev-env now applies this automatically. `lib/ironic_tls_setup.sh` adds the
+networking-service DNS names to the certificate SAN and appends the
+`ironic CA` to the certificate file when `ENABLE_TOR_DEMO=true`. A fresh
+deploy therefore passes TLS verification without a manual fix. Delete any
+cached `${WORKING_DIR}/certs` before redeploying so the certificate
+regenerates. The proper fix still belongs upstream: IrSO should mount the
+real CA as the `cafile` and issue the networking-service certificate with
+a SAN for the service DNS name.
 
 ### Confirmed switch programming
 
@@ -269,34 +276,35 @@ The log reported `Successfully configured port tor-port-0 on switch
 access VLAN 3 at bind time. This is the first confirmed end-to-end run of
 the declarative switch configuration.
 
-### The remaining limitation: VLAN is lost on guest reboot
+### Persistence: fixed with host-owned persistent ports
 
-The switch port in this setup is the libvirt tap. libvirt removes and
-re-adds the OVS port on each guest reboot. The recreated port has no VLAN.
-After each node finished deploy and rebooted into the provisioned OS, the
-tap was recreated and the VLAN tag was gone. No component re-applies the
-VLAN while the host is `provisioned`. This matches the earlier warning
-that tap recreation loses VLAN state.
+The first runs lost the VLAN on guest reboot. The switch port was the
+libvirt-managed OVS port. libvirt removed and re-added the port on each
+guest power cycle, and the recreated port had no VLAN. No component
+re-applies the VLAN while the host is `provisioned`.
 
-The result: the switch-config mechanism is demonstrable, but same-VLAN
-connectivity between the booted guests does not hold with OVS on the host.
+The fix makes the OVS ports host-owned and persistent. vm-setup creates
+each port as a tap and attaches the guest demo NIC with libvirt
+`managed='no'`, so libvirt never deletes the port. A systemd service
+(`metal3-tor-taps`) recreates the ports on host boot. Metal3 programs the
+VLAN once, and it survives guest power cycles.
 
-### Recommendation: use a separate virtual switch
+Verified: after both nodes provisioned and rebooted into the OS, both
+ports kept access VLAN 3. A hard power cycle (libvirt destroy and start)
+of a node kept its port and VLAN. The two guests then reached each other
+over VLAN 3 with their demo addresses (`10.30.0.11` and `10.30.0.12`),
+with bidirectional ping and no loss.
 
-The persistence problem comes from coupling the switch port to the guest
-VM lifecycle. A separate virtual switch decouples them. The switch port
-then belongs to the switch, not to the libvirt tap, so a guest reboot
-does not remove the VLAN.
+### Optional future improvement: a separate virtual switch
 
-- A virtual switch appliance keeps port configuration across guest
-  reboots. It also advertises LLDP, which removes the manual `switchPort`
-  mapping, and it offers a real switch CLI for the audience.
+The host-owned persistent ports solve persistence with OVS, so a separate
+virtual switch is no longer required. It remains an option for extra
+realism. A virtual switch appliance advertises LLDP, which removes the
+manual `switchPort` mapping, and it offers a real switch CLI for the
+audience.
+
 - The installed `networking-generic-switch` drivers include `arista`,
   `cumulus`, `sonic`, `nokia`, `juniper`, `cisco`, and `dell`. Arista
   cEOS or SONiC are container-friendly candidates.
 - The cost is image acquisition, link wiring, LLDP setup, and management
   access. The Metal3, BMO, and Ironic control path does not change.
-
-A lighter option keeps OVS and adds a reconciler. The reconciler watches
-for OVS port recreation and re-applies the VLAN. This is less realistic
-than a virtual switch, but it needs less setup.

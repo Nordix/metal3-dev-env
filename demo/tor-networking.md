@@ -1,23 +1,19 @@
 # ToR networking demo
 
-This workflow is verified end-to-end for switch programming. During
-provisioning, Ironic configured access VLAN 3 on both third-NIC ports.
-Read the [lessons learned](tor-lessons-learned.md) before running it: it
-records the required TLS fix, the verified run, and the persistence
-limitation. Switch SSH authentication is verified. The earlier mapping
-rejection was state-dependent, not a switch-access failure. Supply the
-port mapping through `switchPort` while the host is `available`.
+This workflow is verified end to end. During provisioning, Ironic
+configured access VLAN 3 on both third-NIC ports, the VLAN persisted
+across guest reboots and a hard power cycle, and the two guests reached
+each other over VLAN 3. Read the [lessons learned](tor-lessons-learned.md)
+for the full run, the TLS fix, and the persistence fix. Switch SSH
+authentication is verified. The earlier mapping rejection was
+state-dependent, not a switch-access failure. Supply the port mapping
+through `switchPort` while the host is `available`.
 
-Prerequisite: the conductor must verify TLS to the `ironic-networking`
-service. The Ironic certificate must carry the service DNS name in its
-SAN, and the `cafile` must trust the real CA. Without this fix, cleaning
-loops in `clean failed` and no switch port is programmed. See the lessons
-learned for the fix.
-
-Limitation: the switch port is the libvirt tap. A guest reboot recreates
-the tap and loses the VLAN. Same-VLAN connectivity between the booted
-guests does not hold with OVS on the host. A separate virtual switch
-keeps the port configuration across guest reboots.
+Both required fixes are in dev-env now. The generated Ironic certificate
+carries the networking-service DNS name in its SAN and bundles the CA, so
+the conductor verifies TLS to the `ironic-networking` service. The demo
+NIC attaches to a host-owned persistent OVS port, so the VLAN that Metal3
+programs survives guest reboots. See the lessons learned for details.
 
 This live demo uses two normal dev-env guests, one OVS bridge (`tor-switch`),
 and a dedicated third NIC on each guest. BMO, Ironic, and
@@ -76,15 +72,18 @@ Enabling the flag:
 1. Adds the `tor-demo` libvirt network and third NIC to every bare-metal VM.
 1. Installs OVS and creates `tor-switch`, with a dev-env ownership marker.
    Setup refuses to adopt an existing unmarked bridge with that name.
-1. Names the demo taps `tor-port-0`, `tor-port-1`, etc., in VM inventory order.
-   Libvirt recreates these tap names when guests start.
+1. Creates host-owned persistent OVS ports `tor-port-0`, `tor-port-1`,
+   etc., in VM inventory order, and attaches each guest demo NIC to its
+   port with libvirt `managed='no'`. A systemd service recreates the ports
+   on host boot. Because libvirt does not own the port, the VLAN survives
+   guest power cycles.
 1. Enables BMO's `IronicNetworking` gate, switch Secret configuration, and
    `ironic-networking` interface, including for locally run BMO.
 1. Enables the networking service in the generated `Ironic` CR.
 
 The bridge has no IP, DHCP, NAT, uplink, or manually configured VM port
-VLANs. A stable tap name does not itself persist a VLAN after the tap is
-recreated: verify reconciliation and connectivity after guest restarts.
+VLANs. The persistent, host-owned ports keep the VLAN across guest power
+cycles; verify the tags and connectivity after guest restarts.
 
 For kind with IrSO, setup also connects the host's Linux `provisioning`
 bridge to the kind control-plane container using a dedicated veth pair.
@@ -221,10 +220,9 @@ export IMAGE_OS=ubuntu
 Wait for the guests to boot and Kubernetes bootstrap to complete. Verify
 the actual OVS tags again before testing connectivity: both must show `3`
 after tenant configuration is applied. Do not manually set tags to make
-the test pass. Libvirt may
-recreate taps during provisioning; stable names do not preserve VLAN
-configuration. If the tags are lost, report the lifecycle failure rather
-than manually restoring them or assuming provisioned-host reconciliation.
+the test pass. The host-owned persistent ports keep the VLAN across the
+provisioning reboots, so the tags remain `3`. If the tags are lost, report
+the failure rather than manually restoring them.
 
 ## Configure guest addresses
 
@@ -320,9 +318,10 @@ tags must remain `3`, and provisioning/external networking must be
 unchanged.
 
 Do not demonstrate a VLAN 3-to-4 change on a provisioned BMH as though
-upstream BMO supports live updates. Guest restart recovery is also not
-an acceptance claim: tap recreation can lose VLAN state, and the
-verified BMO state gate does not reapply it while the host is provisioned.
+upstream BMO supports live updates. The verified BMO state gate does not
+reapply switch intent while the host is provisioned. Guest restart
+recovery is not needed here: the host-owned persistent ports keep the
+VLAN across reboots, so it does not depend on BMO reapplying it.
 
 ## Cleanup
 
