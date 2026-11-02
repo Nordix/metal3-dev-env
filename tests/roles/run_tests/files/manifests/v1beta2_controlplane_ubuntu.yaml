@@ -101,8 +101,8 @@ spec:
     users:
     - name: metal3
       sshAuthorizedKeys:
-      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF9Zd3gyARkCiokVVQGe6K4oXixGoqHPMb4bEwzIWuKV
-        metal3ci@sunnat-tor-demo
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILapEqRVsQ5AxeGJACmBa4dIP9vdGYMz7CWMArOQdjB1
+        ubuntu@sunnat-tor-demo
       sudo: ALL=(ALL) NOPASSWD:ALL
   machineTemplate:
     spec:
